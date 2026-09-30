@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# main / master ブランチへの直接 push を防止する
+while read local_ref local_oid remote_ref remote_oid
+do
+  if [ "$remote_ref" = "refs/heads/main" ] || [ "$remote_ref" = "refs/heads/master" ]; then
+    echo ""
+    echo "================================================================="
+    echo " [ERROR] Direct push to '$remote_ref' is forbidden!"
+    echo " Work on 'develop' branch or create a topic branch (e.g. pr/fix-xxx)."
+    echo "================================================================="
+    echo ""
+    exit 1
+  fi
+done
+
+exit 0

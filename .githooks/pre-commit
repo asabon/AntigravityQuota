@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# main / master ブランチへの直接コミットを防止する
+current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+  echo ""
+  echo "================================================================="
+  echo " [ERROR] Direct commit to '$current_branch' branch is forbidden!"
+  echo " Work on 'develop' branch or create a topic branch (e.g. pr/fix-xxx)."
+  echo "================================================================="
+  echo ""
+  exit 1
+fi
+
+exit 0
