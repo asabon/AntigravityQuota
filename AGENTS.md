@@ -35,32 +35,72 @@
 本リポジトリは **本家（`upstream`: `Henrik-3/AntigravityQuota`）にクリーンな PR を提出しつつ、手元で AI ハーネス環境を維持する** 運用を行います。
 
 ### 1. ブランチの役割
-- **`develop`（作業本線・AIハーネス拠点）**:
-  - ユーザーの開発本線ブランチ。この `AGENTS.md` や `.agents/` などの AI ハーネス環境が常備されています。
-  - **日々の実装・調査・デバッグ・テストはすべて `develop` ブランチ上で行います。**
+- **`develop`（保護・統合本線ブランチ）**:
+  - 開発のベースラインとなる保護ブランチ。`AGENTS.md` や `.agents/` などの AI ハーネス環境が常備されています。
+  - ⚠️ **`develop` への直接 commit / push は禁止**。必ず `feature/` ブランチから PR を作成し、**Squash & Merge** でマージします。
+- **`feature/<topic-name>`（機能開発・作業ブランチ）**:
+  - `develop` から分岐して日々の作業を行うトピックブランチ。実装、デバッグ、テスト、WIP コミットはすべてここで行います。
+  - 作業完了後、`develop` 宛てに PR を作成し、Squash & Merge します。
 - **`upstream/main`（本家の追跡）**:
   - 本家の最新状態を同期するための読み取り専用ブランチ。直接コミットしてはなりません。
 - **`origin/main`（Fork の main / 本家ミラー）**:
   - Fork 先リポジトリの main ブランチ。`upstream/main` のクリーンなコピー（保管・GitHub 表示用）とし、直接のコミットや開発作業は行いません。
 - **`pr/<topic-name>`（本家提出用 PR ブランチ）**:
-  - 本家へ PR を出す際、**一時的に `upstream/main` から作成する専用ブランチ**。
+  - 本家へ PR を出す際、**一時的に `upstream/main` から作成する専用ブランチ**。`develop` に Squash & Merge された 1 コミットのみを cherry-pick して作成します。
 
-### 2. PR 作成手順（ハーネス混入の厳格な防止）
-本家への PR を作成する際は、必ず以下の手順を踏んでください：
+### 2. コミット・ブランチ分離の原則（ハーネス混入の厳格防止）
+Squash & Merge を行うと、feature ブランチ内の全コミットが 1 つに統合されます。
+そのため、以下の原則を厳守してください：
+
+- **本家還元コード**（`src/` 配下などの修正）と **ローカルハーネス**（`AGENTS.md`, `.agents/` 等）の変更は、**同一 PR で混ぜずにブランチを分ける**こと。
+  - 理由: ハーネス変更が混ざったまま Squash されると、本家向け PR ブランチへの cherry-pick 時に手作業でハーネスファイルを除外・修正する手間が発生します。
+
+### 3. 日常の開発・マージフロー（feature → develop）
+
+```powershell
+# 1. develop から feature ブランチを作成
+git switch develop
+git pull origin develop
+git switch -c feature/<topic-name>
+
+# 2. 実装・検証（WIP コミット等は自由に行って OK）
+npm run compile
+npm run lint
+git commit -m "..."
+
+# 3. origin へ push して develop 宛てに PR 作成
+git push -u origin feature/<topic-name>
+# (PR 本文を scratch/pr_body.md に用意)
+gh pr create --repo asabon/AntigravityQuota --base develop --head feature/<topic-name> --body-file scratch/pr_body.md
+
+# 4. PR を確認し、Squash & Merge を実行
+gh pr merge <PR番号> --repo asabon/AntigravityQuota --squash --delete-branch
+
+# 5. ローカルの develop を最新化し、ローカル作業ブランチを削除
+git switch develop
+git pull origin develop
+git branch -d feature/<topic-name>
+```
+
+### 4. 本家（upstream）への PR 作成手順
+`develop` に Squash & Merge されたクリーンな 1 コミットのみを cherry-pick します：
 
 ```powershell
 # 1. 本家の最新から PR 用トピックブランチを作成
 git fetch upstream
-git switch -c pr/fix-quota-display upstream/main
+git switch -c pr/<topic-name> upstream/main
 
-# 2. develop ブランチで作成した修正コミットのみを cherry-pick
+# 2. develop ブランチの該当コミット（Squash された 1 コミット）を cherry-pick
+git log -n 5 develop --oneline
 git cherry-pick <COMMIT_HASH>
 
 # 3. 差分検証（重要）: ハーネスファイルが含まれていないことを確認
 git diff upstream/main --stat
 
 # 4. 自分の Fork (origin) に push して本家へ PR を作成
-git push -u origin pr/fix-quota-display
+git push -u origin pr/<topic-name>
+# (PR 本文を scratch/upstream_pr_body.md に用意)
+gh pr create --repo Henrik-3/AntigravityQuota --base main --head asabon:pr/<topic-name> --body-file scratch/upstream_pr_body.md
 ```
 
 > ⚠️ **絶対遵守**:
