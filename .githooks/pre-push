@@ -1,8 +1,15 @@
 #!/bin/sh
 
-# main / master ブランチへの直接 push を防止する
+zero="0000000000000000000000000000000000000000"
+
 while read local_ref local_oid remote_ref remote_oid
 do
+  # ブランチ削除の場合はスキップ
+  if [ "$local_oid" = "$zero" ]; then
+    continue
+  fi
+
+  # 1. main / master ブランチへの直接 push を防止する
   if [ "$remote_ref" = "refs/heads/main" ] || [ "$remote_ref" = "refs/heads/master" ]; then
     echo ""
     echo "================================================================="
@@ -12,6 +19,27 @@ do
     echo ""
     exit 1
   fi
+
+  # 2. 本家 PR 用トピックブランチ (pr/*) にローカルハーネスファイルが混入していないか検査
+  case "$remote_ref" in
+    refs/heads/pr/*)
+      forbidden_files=$(git ls-tree -r --name-only "$local_oid" 2>/dev/null | grep -E '^(AGENTS\.md|\.agents/|\.githooks/|scratch/)')
+      if [ -n "$forbidden_files" ]; then
+        echo ""
+        echo "================================================================="
+        echo " [ERROR] Forbidden AI harness files detected in '$remote_ref'!"
+        echo " Upstream PR branches must NEVER contain harness/local files."
+        echo "-----------------------------------------------------------------"
+        echo " Detected files:"
+        echo "$forbidden_files" | sed 's/^/   - /'
+        echo "-----------------------------------------------------------------"
+        echo " Please remove these files or cherry-pick only clean commits."
+        echo "================================================================="
+        echo ""
+        exit 1
+      fi
+      ;;
+  esac
 done
 
 exit 0
