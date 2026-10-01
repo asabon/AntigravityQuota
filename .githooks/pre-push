@@ -23,7 +23,7 @@ do
   # 2. 本家 PR 用トピックブランチ (pr/*) にローカルハーネスファイルが混入していないか検査
   case "$remote_ref" in
     refs/heads/pr/*)
-      forbidden_files=$(git ls-tree -r --name-only "$local_oid" 2>/dev/null | grep -E '^(AGENTS\.md|\.agents/|\.githooks/|scratch/)')
+      forbidden_files=$(git ls-tree -r --name-only "$local_oid" 2>/dev/null | grep -E '^(AGENTS\.md|\.agents/|\.githooks/|scratch/|\.github/workflows/check-no-japanese\.yml)')
       if [ -n "$forbidden_files" ]; then
         echo ""
         echo "================================================================="
@@ -34,6 +34,20 @@ do
         echo "$forbidden_files" | sed 's/^/   - /'
         echo "-----------------------------------------------------------------"
         echo " Please remove these files or cherry-pick only clean commits."
+        echo "================================================================="
+        echo ""
+        exit 1
+      fi
+
+      # 3. 本家 PR 用トピックブランチ (pr/*) の src/ に日本語文字が含まれていないか検査
+      japanese_lines=$(git grep -I -n -P '[\x{3040}-\x{309F}\x{30A0}-\x{30FF}\x{4E00}-\x{9FFF}\x{FF66}-\x{FF9F}]' "$local_oid" -- 'src/**' 2>/dev/null)
+      if [ -n "$japanese_lines" ]; then
+        echo ""
+        echo "================================================================="
+        echo " [ERROR] Japanese characters detected in 'src/' for '$remote_ref'!"
+        echo " Upstream code and comments must be strictly English."
+        echo "-----------------------------------------------------------------"
+        echo "$japanese_lines"
         echo "================================================================="
         echo ""
         exit 1
