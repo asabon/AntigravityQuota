@@ -1,0 +1,37 @@
+name: Check No Japanese in Code
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/**'
+      - '.agents/scripts/check-no-japanese.mjs'
+      - '.github/workflows/check-no-japanese.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  check-language:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check for Japanese in src/
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node .agents/scripts/check-no-japanese.mjs --diff origin/${{ github.base_ref }}
+          else
+            node .agents/scripts/check-no-japanese.mjs --all
+          fi

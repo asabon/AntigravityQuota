@@ -30,6 +30,24 @@
 
 ---
 
+## 🌐 言語方針（日本語と英語の使い分け）
+
+本リポジトリは英語圏のプロジェクトを Fork していますが、開発者の思考・作業効率を最優先するため、以下のように明確な境界線を設けて使い分けます。
+
+- **日本語を使用する領域**:
+  - AI エージェントとの対話・指示・相談
+  - ローカルメモ、作業記録、設計検討 (`AGENTS.md`, `.agents/`, `scratch/` 内のファイル)
+  - `feature` ブランチでの日々の作業（WIP コミットメッセージなど）
+- **英語を使用する領域**:
+  - `src/` 配下のソースコード内のコメント・Docstring
+  - Squash & Merge 時の最終コミットメッセージ (Conventional Commits 形式)
+  - upstream（本家）向け Pull Request のタイトルおよび本文
+
+> 💡 **AI エージェントへの指示**:
+> ユーザーからの指示が日本語であっても、`src/` 配下のコードコメントや本家提出用の PR 本文・コミットメッセージを作成する際は、AI が責任を持って自然な英語に翻訳・作成してください。
+
+---
+
 ## 🌿 Git & ブランチ運用ルール（最重要）
 
 本リポジトリは **本家（`upstream`: `Henrik-3/AntigravityQuota`）にクリーンな PR を提出しつつ、手元で AI ハーネス環境を維持する** 運用を行います。
@@ -104,7 +122,7 @@ gh pr create --repo Henrik-3/AntigravityQuota --base main --head asabon:pr/<topi
 ```
 
 > ⚠️ **絶対遵守**:
-> PR 用ブランチには、`AGENTS.md`、`.agents/`、その他ローカル用のハーネスファイルを絶対にコミット・混入させてはなりません。
+> PR 用ブランチには、`AGENTS.md`、`.agents/`、`.github/workflows/check-no-japanese.yml`、その他ローカル用のハーネスファイルを絶対にコミット・混入させてはなりません。
 
 ---
 
@@ -119,6 +137,10 @@ gh pr create --repo Henrik-3/AntigravityQuota --base main --head asabon:pr/<topi
 - **Lint チェック**:
   ```powershell
   npm run lint
+  ```
+- **日本語混入チェック (`src/` 配下)**:
+  ```powershell
+  node .agents/scripts/check-no-japanese.mjs --all
   ```
 - **拡張機能パッケージング確認（必要時）**:
   ```powershell
