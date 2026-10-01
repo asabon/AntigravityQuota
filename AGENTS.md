@@ -75,7 +75,12 @@ Squash & Merge を行うと、feature ブランチ内の全コミットが 1 つ
 
 ### 3. 日常の開発・マージフロー（feature → develop）
 
+AI エージェントとユーザーの役割分担：
+- 🤖 **AI エージェントの担当**: ブランチ作成 〜 実装 〜 検証 〜 PR 作成まで。**マージは行わず、ユーザーに PR URL を報告してレビューを依頼する**こと。
+- 👤 **ユーザーの担当**: PR の差分や CI 結果を確認し、**ユーザー自身が GitHub 上で Squash & Merge（または `gh pr merge`）を実行**する。
+
 ```powershell
+# --- [AI の作業範囲] ---
 # 1. develop から feature ブランチを作成
 git switch develop
 git pull origin develop
@@ -84,17 +89,20 @@ git switch -c feature/<topic-name>
 # 2. 実装・検証（WIP コミット等は自由に行って OK）
 npm run compile
 npm run lint
+node .agents/scripts/check-no-japanese.mjs --all
 git commit -m "..."
 
 # 3. origin へ push して develop 宛てに PR 作成
 git push -u origin feature/<topic-name>
 # (PR 本文を scratch/pr_body.md に用意)
 gh pr create --repo asabon/AntigravityQuota --base develop --head feature/<topic-name> --body-file scratch/pr_body.md
+# ※ PR 作成後、ユーザーに PR の URL を報告して停止する（AI による自動マージは禁止）。
 
-# 4. PR を確認し、Squash & Merge を実行
-gh pr merge <PR番号> --repo asabon/AntigravityQuota --squash --delete-branch
+# --- [ユーザーの作業範囲] ---
+# 4. ユーザーが GitHub 上で差分・CI を確認し、Squash & Merge を実行
+# （CLI で行う場合: gh pr merge <PR番号> --repo asabon/AntigravityQuota --squash --delete-branch）
 
-# 5. ローカルの develop を最新化し、ローカル作業ブランチを削除
+# 5. マージ完了後、ローカルの develop を最新化し、作業ブランチを削除
 git switch develop
 git pull origin develop
 git branch -d feature/<topic-name>
