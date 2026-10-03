@@ -1,3 +1,4 @@
+import './setup';
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
