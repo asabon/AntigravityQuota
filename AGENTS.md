@@ -66,12 +66,12 @@
 - **`pr/<topic-name>`（本家提出用 PR ブランチ）**:
   - 本家へ PR を出す際、**一時的に `upstream/main` から作成する専用ブランチ**。`develop` に Squash & Merge された 1 コミットのみを cherry-pick して作成します。
 
-### 2. コミット・ブランチ分離の原則（ハーネス混入の厳格防止）
-Squash & Merge を行うと、feature ブランチ内の全コミットが 1 つに統合されます。
+### 2. コミット・ブランチ分離の原則（ハーネス・ドキュメント混入の厳格防止）
+Squash & Merge を行うと、ブランチ内の全コミットが 1 つに統合されます。
 そのため、以下の原則を厳守してください：
 
-- **本家還元コード**（`src/` 配下などの修正）と **ローカルハーネス**（`AGENTS.md`, `.agents/` 等）の変更は、**同一 PR で混ぜずにブランチを分ける**こと。
-  - 理由: ハーネス変更が混ざったまま Squash されると、本家向け PR ブランチへの cherry-pick 時に手作業でハーネスファイルを除外・修正する手間が発生します。
+- **本家還元コード**（`src/` 配下などの修正）と **ローカルハーネス・ドキュメント**（`AGENTS.md`, `.agents/`, `docs/` 等）の変更は、**同一 PR で混ぜずにブランチを分ける**こと。
+  - 理由: ドキュメントやハーネスが混ざったまま Squash されると、本家向け PR ブランチへの cherry-pick 時に手作業で除外・修正する手間や混入事故が発生します。
 
 ### 3. 日常の開発・マージフロー（feature → develop）
 
@@ -132,6 +132,25 @@ gh pr create --repo Henrik-3/AntigravityQuota --base main --head asabon:pr/<topi
 > ⚠️ **絶対遵守**:
 > PR 用ブランチには、`AGENTS.md`、`.agents/`、`.github/workflows/check-no-japanese.yml`、その他ローカル用のハーネスファイルを絶対にコミット・混入させてはなりません。
 
+### 5. 本家に PR が採用されなかった場合のリカバリー手順（Revert 戦略）
+
+本家に提出した PR がクローズ・見送り（Reject）になった場合、次の新機能を開発する際に手元の `develop` に不採用コードが残っていると、次の機能に混ざってしまいます。
+そのため、以下の手順で **手元の `develop` から該当コードのみを Revert（取り消し）** して本家追従状態に戻します：
+
+```powershell
+# 1. develop を最新化
+git switch develop
+git pull origin develop
+
+# 2. 採用されなかった機能の Squash コミットを Revert
+# （※ ハーネスやドキュメントは保持され、src/ の変更のみが綺麗に打ち消されます）
+git revert <不採用機能のSQUASH_COMMIT_HASH> -m 1   # ※マージコミットの場合 -m 1、通常コミットなら git revert <HASH>
+git push origin develop
+
+# 3. 該当の提案書（docs/proposals/XXX.md）のステータスを Closed / Rejected に更新
+# 4. これでコードが本家最新と同期され、次の新機能提案・開発に安全に着手できます！
+```
+
 ---
 
 ## 🛠️ ビルド & 検証コマンド
@@ -171,3 +190,24 @@ GitHub CLI (`gh`) を使用して PR を作成・編集する場合は、以下�
 3. **ルール詳細**:
    - [`.agents/rules/cli-markdown-escaping.md`](.agents/rules/cli-markdown-escaping.md)
    - [`.agents/rules/windows-shell-commands.md`](.agents/rules/windows-shell-commands.md)
+
+---
+
+## 📝 新機能・仕様変更の事前文書化ルール（Proposal）
+
+新機能の追加や大幅な仕様変更を行う際は、手戻りを防止し本家への PR 提出をスムーズにするため、**コード実装前に必ず `docs/proposals/` 配下に設計提案書を作成し、ユーザーと合意形成を行う** 運用とします。
+
+1. **提案書テンプレート**:
+   - [`docs/proposals/TEMPLATE.md`](docs/proposals/TEMPLATE.md) を使用し、`docs/proposals/XXX-<topic-name>.md` を作成。
+2. **記載内容**:
+   - 背景と課題、技術調査結果（API レスポンス等）、アーキテクチャ・UI 設計、プラン差異への動的適応設計、実装計画、下位互換性、**本家向け PR ドラフト（英語）**。
+3. **2段階ブランチ運用（最重要）**:
+   - **Phase 1**: `docs/<topic-name>` ブランチで提案書を作成し、先に `develop` へ PR ＆ Squash Merge する。
+   - **Phase 2**: `develop` を最新化後、`feature/<topic-name>` ブランチを切って `src/` 配下のみを実装し、`develop` へ PR ＆ Squash Merge する（これにより、本家に cherry-pick する 1 コミットが `src/` のみになる）。
+   - **Phase 2.5（事後同期）**: 実装中に設計書と差異が生じた場合でも、`feature/` ブランチで `docs/` を触ってはならない（混入防止）。コードマージ後に `docs/sync-<topic-name>` ブランチでドキュメントを更新して `develop` へマージする。
+4. **詳細ルール & スキル**:
+   - ルール詳細: [`.agents/rules/feature-proposal-workflow.md`](.agents/rules/feature-proposal-workflow.md)
+   - スキル定義: [`.agents/skills/feature-proposal/SKILL.md`](.agents/skills/feature-proposal/SKILL.md)
+
+
+
