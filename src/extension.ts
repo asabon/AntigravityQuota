@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Antigravity Quota Watcher - Main Entry
  */
 
@@ -84,7 +84,11 @@ export async function activate(context: vscode.ExtensionContext) {
 			prompt_credits: snapshot.prompt_credits,
 			timestamp: snapshot.timestamp,
 		});
-		status_bar.update(snapshot, current_config.show_prompt_credits ?? false);
+		status_bar.update(
+			snapshot,
+			current_config.show_prompt_credits ?? false,
+			current_config.display_mode
+		);
 	});
 
 	quota_manager.on_error(err => {
@@ -113,6 +117,8 @@ export async function activate(context: vscode.ExtensionContext) {
 			} else {
 				quota_manager.stop_polling();
 			}
+			// Trigger refresh on display mode change
+			quota_manager.fetch_quota();
 		})
 	);
 
