@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
-import { format_group_status, get_abbreviation, draw_progress_bar } from '../ui/status_bar';
+import { format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned } from '../ui/status_bar';
 import { server_user_status_response, server_user_quota_summary_response, quota_group_info } from '../utils/types';
 
 describe('QuotaManager - parse_quota_groups', () => {
@@ -280,5 +280,14 @@ describe('UI Utilities', () => {
 		assert.strictEqual(qm.format_time(-100, futureDate), 'Ready');
 		assert.ok(qm.format_time(30 * 60 * 1000, futureDate).startsWith('30m'));
 		assert.ok(qm.format_time(150 * 60 * 1000, futureDate).startsWith('2h 30m'));
+	});
+
+	it('should filter pinned groups correctly', () => {
+		assert.strictEqual(is_group_pinned('Gemini Models', []), true);
+		assert.strictEqual(is_group_pinned('Gemini Models', ['Gemini']), true);
+		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Gemini']), false);
+		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude']), true);
+		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude and GPT models']), true);
+		assert.strictEqual(is_group_pinned('Gemini Models', ['none']), false);
 	});
 });

@@ -76,6 +76,15 @@
           "default": "models",
           "description": "Status bar display mode: 'models' (pinned models), 'groups' (shared 5h/weekly quota groups), or 'both'.",
           "order": 5
+        },
+        "agq.pinnedGroups": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Quota group names to display in the status bar (e.g. ['Gemini', 'Claude']). If empty, all groups are displayed.",
+          "order": 6
         }
       }
     }
