@@ -262,8 +262,8 @@ describe('StatusBar Formatting - format_group_status', () => {
 
 describe('UI Utilities', () => {
 	it('should abbreviate model names', () => {
-		assert.strictEqual(get_abbreviation('Gemini 3.8 Flash (Low)'), 'G3.8F(L)');
-		assert.strictEqual(get_abbreviation('Claude Sonnet 5.5 (Medium)'), 'Claude S5.5(M)');
+		assert.strictEqual(get_abbreviation('Gemini 3.5 Flash (Medium)'), 'G3.5F(M)');
+		assert.strictEqual(get_abbreviation('Claude Sonnet 4.6 (Thinking)'), 'Claude S4.6T');
 		assert.strictEqual(get_abbreviation('Custom Model 9'), 'CM9');
 	});
 
