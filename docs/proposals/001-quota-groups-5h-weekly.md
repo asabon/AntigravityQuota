@@ -313,7 +313,7 @@ feat: support weekly and 5-hour quota groups via RetrieveUserQuotaSummary
 ## Summary
 This PR adds support for retrieving and displaying both **5-Hour** and **Weekly** shared quota limits for model groups (Gemini Models, Claude and GPT models), matching the detailed quota view found in Antigravity IDE's native "Settings > Models" page.
 
-Resolves / Implements the proposal discussed in #(Issue番号).
+Resolves #28.
 
 ## Motivation & Problem
 Currently, AGQ fetches quota data solely through `GetUserStatus`. However, this approach has two major limitations:
@@ -344,6 +344,12 @@ Exposing the underlying shared quota groups directly solves this redundancy and 
 - All 15 unit tests passing (`npm run test`).
 - Clean TypeScript build (`npm run compile`).
 - Verified status bar display switching, menu interactions, and settings reactivity.
+## Screenshots
+### Status Bar Display (`agq.displayMode: "groups"`)
+![Status Bar](https://github.com/user-attachments/assets/f093695b-fcc3-4961-873e-f9a24dfb9d47)
+
+### Interactive QuickPick Menu
+![QuickPick Menu](https://github.com/user-attachments/assets/22219a4f-9092-4ab0-9371-d3a221c7e210)
 ```
 
 ### 7.3 日本語対訳（PR）
@@ -351,7 +357,7 @@ Exposing the underlying shared quota groups directly solves this redundancy and 
 > #### 概要
 > 本 PR は、Antigravity IDE 本体の「Settings > Models」ページに表示されている詳細ビューと同様に、モデルグループ（Gemini Models、Claude and GPT models）の **5時間枠** および **週間枠** の両方の共有クォータ制限を取得・表示する機能を追加します。
 > 
-> Issue #(Issue番号) で議論された提案を実装するものです。
+> Issue #28 で議論された提案を実装するものです。
 > 
 > #### 動機と課題
 > 現在、AGQ は `GetUserStatus` のみでクォータを取得しています。しかし、この方法には2つの大きな制約があります：
@@ -377,3 +383,6 @@ Exposing the underlying shared quota groups directly solves this redundancy and 
 > - 単体テスト 15 件すべて PASS（`npm run test`）。
 > - TypeScript コンパイル通過（`npm run compile`）。
 > - ステータスバー切り替え、メニュー操作、設定変更の即時反映を確認済み。
+> #### スクリーンショット
+> - ステータスバー表示 (`agq.displayMode: "groups"`): [画像](https://github.com/user-attachments/assets/f093695b-fcc3-4961-873e-f9a24dfb9d47)
+> - インタラクティブメニュー: [画像](https://github.com/user-attachments/assets/22219a4f-9092-4ab0-9371-d3a221c7e210)
