@@ -3,7 +3,7 @@
 - **作成日**: 2026-10-03
 - **ステータス**: Implemented (Merged to develop via PR #5)
 - **対象コンポーネント**: `src/utils/types.ts`, `src/core/quota_manager.ts`, `src/ui/status_bar.ts`, `src/core/config_manager.ts`, `package.json`, `src/test/`
-- **関連 Issue / PR**: [PR #5 (develop)](https://github.com/asabon/AntigravityQuota/pull/5), 本家提出予定
+- **関連 Issue / PR**: [PR #5 (develop)](https://github.com/asabon/AntigravityQuota/pull/5), [PR #6 (develop)](https://github.com/asabon/AntigravityQuota/pull/6), 本家提出予定
 
 ---
 
@@ -138,7 +138,7 @@ export type display_mode = 'models' | 'groups' | 'both';
 
 ### 3.2 メニュー（QuickPick）の UI 設計
 
-ステータスバーをクリックした際のポップアップメニューで、最上部に共有グループ枠を配置し、グループ名の横に 1 つだけピン留めトグル用チェックマークを付与。子行として各リミット（Weekly / 5-Hour）のプログレスバーを縦並びでインデント表示します。
+ステータスバーをクリックした際のポップアップメニューで、最上部に共有グループ枠を配置。グループ名の横に 1 つだけピン留めトグル用チェックマークを付与し、子行として各リミット（Weekly / 5-Hour）のプログレスバーを縦並びでインデント表示します。
 
 ```text
 --- Quota Groups (Toggle Pin) ---
@@ -156,7 +156,7 @@ $(check) Gemini 3.8 Flash (Low)
 ...
 ```
 
-- 親行または子行のどこをクリックしても、該当グループ全体のピン留めが即座にトグルされます。
+- 親行（グループ名）または子行（Weekly/5-Hour）のどこをクリックしても、該当グループ全体のピン留めが即座にトグルされます。
 
 ### 3.3 ステータスバー表示モードの設計
 
@@ -192,7 +192,12 @@ $(check) Gemini 3.8 Flash (Low)
   - `agq.displayMode` および `agq.pinnedGroups` を設定スキーマに追加。
 - [x] **5. 自動単体テストの導入 (`src/test/`)**:
   - 外部依存ゼロの `node:test` を使用し、in-memory の VS Code モック（`src/test/setup.js`）を整備。
-  - データパース、フォールバック、ステータスバーフォーマット、グループフィルタ、メニュー構築を網羅する **全 15 件のテストを実装し、すべて PASS**。
+  - **以下の 5 領域・計 15 件の単体テストを実装し、すべて PASS**:
+    1. **プラン・バケット解析 (`parse_quota_groups`)**: 5h と weekly の両リミットの正確なパース、5h のみ存在するプランへの適応性、空/未定義データの安全なハンドリング。
+    2. **統合＆フォールバック耐性 (`parse_response`)**: 2 つの API レスポンスのマージ、`RetrieveUserQuotaSummary` 失敗時でも `GetUserStatus` のみでクラッシュせず動作継続するフォールバック検証。
+    3. **ステータスバーフォーマット (`format_group_status`)**: 複数バケット/単一バケット文字列生成、残量 20% 未満の警告アイコン、枯渇時のエラーアイコン判定。
+    4. **ピン留め＆フィルタリング (`is_group_pinned`, `get_group_short_name`)**: 短縮名 (`Claude/GPT`, `GPT`, `Claude`)・完全名・空配列（全許可）の柔軟な判定ロジック。
+    5. **メニュー階層構造 (`build_menu_items`)**: チェックマーク付き親行と縦並びプログレスバーを持つ子行の QuickPickItem 構造生成の検証。
 - [x] **6. 手元動作確認**:
   - Antigravity IDE 実環境（Extension Development Host）で実プロセスと通信し、正常動作を確認済み。
 
@@ -209,17 +214,106 @@ $(check) Gemini 3.8 Flash (Low)
 
 ---
 
-## 6. 本家（upstream）向け PR ドラフト (English PR Draft)
+## 6. 本家（upstream）向け 事前相談 Issue ドラフト (English Issue Draft & 日本語対訳)
 
-### Title
+本家にいきなり PR を提出するのではなく、まず Issue にて課題意識と解決方針を提案し、PR 提出の可否を伺うためのドラフトです。
+
+### 6.1 Title（件名）
+```text
+[Feature Request / RFC] Support 5-hour and Weekly shared quota groups via RetrieveUserQuotaSummary
 ```
+
+### 6.2 Body（本文・英語）
+```markdown
+Hi @Henrik-3,
+
+First of all, thank you for developing this fantastic extension! It has been incredibly helpful for monitoring Antigravity usage.
+
+I would like to propose an enhancement regarding how quota limits are displayed, and check if you would be open to a PR.
+
+### 1. Problem & Background
+Currently, AGQ retrieves quota via `/GetUserStatus`. While this works, it presents two limitations:
+1. **Hidden Weekly Limits**: `/GetUserStatus` only exposes a single active window per model (e.g., only the 5-hour limit for Gemini, and only the 1-week limit for Claude). For users on Google AI Pro and other tiers, weekly limits are essential for pacing their work, but currently can only be viewed by opening Antigravity's native "Settings > Models" page.
+2. **Redundancy Across Models**: In Antigravity's backend, models of the same family (e.g. Gemini 3.5, 3.7, 3.8 Flash & Pro) actually share the same underlying group pool (`Gemini Models`). Displaying individual status bar items for each model simply repeats identical percentages. The same applies to Claude and GPT-OSS, which share the `Claude and GPT models` pool.
+
+### 2. Proposed Solution
+By calling `/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary` alongside `/GetUserStatus`, we can access the native shared quota groups (`Gemini Models`, `Claude and GPT models`) and their exact `5h` and `weekly` buckets.
+
+Key aspects of the proposed design:
+- **100% Backward Compatible**: Defaults to the existing `models` display mode. Existing configurations and user workflows remain completely intact.
+- **New `agq.displayMode` Setting**: Allows users to choose between `"models"` (legacy individual models), `"groups"` (shared 5h/1w limits), or `"both"`.
+- **Group Pinning (`agq.pinnedGroups`)**: Users can pin/unpin groups (e.g. show only Gemini or both Gemini and Claude/GPT).
+- **Streamlined Menu (QuickPick)**: Displays each group with its unified checkmark and indented vertical progress bars for Weekly and 5-Hour limits.
+- **Graceful Fallback**: If the quota summary endpoint is ever unavailable or fails, it silently falls back to individual model tracking.
+
+### 3. Automated Unit Test Coverage (15 tests via built-in `node:test`)
+To ensure high quality and zero regressions without adding external dependencies, 15 unit tests have been implemented covering:
+- **Tier & Bucket Parsing**: Correctly parses full limits (5h & weekly), gracefully adapts to tiers with only a 5-hour limit, and safely handles missing/empty group payloads.
+- **Resilience & Fallback**: Validates that if `RetrieveUserQuotaSummary` fails or times out, the extension seamlessly continues running using `GetUserStatus` model data without throwing errors.
+- **Status Bar Formatting**: Tests multi-bucket strings, single-bucket fallback strings, and status icons (normal check, warning icon when <20%, error icon when exhausted).
+- **Pinning & Filtering**: Tests group visibility filtering matching short names (`Claude/GPT`, `GPT`, `Claude`), full display names, and empty (allow-all) configurations.
+- **Menu Hierarchy (QuickPick)**: Verifies that group parent items with checkmarks and indented child bucket rows (vertical progress bars and reset times) are constructed accurately.
+- **UI Helpers**: Verifies progress bar rendering (0%, 50%, 100%), time-until-reset formatting, and legacy model abbreviation logic.
+
+### 4. Readiness
+I have already implemented and verified this feature locally against the live Antigravity Language Server on Windows x64.
+
+Would you be open to reviewing a Pull Request for this feature? If this direction looks good to you, I would be more than happy to submit the PR!
+```
+
+### 6.3 日本語対訳（Issue）
+
+> Henrik-3 さん、こんにちは！
+> まず、この素晴らしい拡張機能を開発してくださりありがとうございます！Antigravity の使用量を監視するのに大変重宝しています。
+> 
+> クォータ制限の表示方法に関する機能強化を提案したく、PR を提出してもよいかご相談させてください。
+> 
+> #### 1. 課題と背景
+> 現在、AGQ は `/GetUserStatus` 経由でクォータを取得しています。これは正常に機能していますが、2つの制約があります：
+> 1. **隠された週間制限**: `/GetUserStatus` はモデルごとに直近の1つの枠しか公開しません（Gemini は 5時間枠のみ、Claude は 1週間枠のみ）。Google AI Pro 等のプランを利用するユーザーにとって、週間制限はペース配分上極めて重要ですが、現状は Antigravity 本体の「設定 > Models」を開かないと確認できません。
+> 2. **モデル間の重複表示**: Antigravity のバックエンドでは、同系統のモデル（Gemini 3.5, 3.7, 3.8 Flash や Pro など）は裏側で同じグループプール（`Gemini Models`）を共有しています。そのため、モデルごとにステータスバーに並べても全く同じパーセントが重複表示されるだけです。Claude と GPT-OSS も同様に `Claude and GPT models` プールを共有しています。
+> 
+> #### 2. 提案する解決策
+> `/GetUserStatus` と並行して `/RetrieveUserQuotaSummary` を呼び出すことで、ネイティブの共有グループ（Gemini Models、Claude and GPT models）と、それぞれの正確な `5h` および `weekly` バケットを取得できます。
+> 
+> 設計の主なポイント：
+> - **100% 後方互換性**: デフォルトの表示モードは従来の `models` のままとし、既存ユーザーの設定や動作を一切壊しません。
+> - **新設定 `agq.displayMode`**: `"models"`（従来型）、`"groups"`（共有 5h/1w 枠）、`"both"`（両方）をユーザーが選択可能。
+> - **グループピン留め（`agq.pinnedGroups`）**: グループ単位で表示/非表示（例: Gemini だけ表示など）をトグル可能。
+> - **整理されたメニュー UI**: 各グループに 1 つのチェックマークを付け、その下に Weekly と 5-Hour のプログレスバーを縦並びで綺麗に表示。
+> - **安全なフォールバック**: 万が一クォータ概要 API が失敗・未対応の場合でも、既存のモデル個別追跡へと自動的に静かにフォールバックします。
+> 
+> #### 3. 自動単体テストの網羅性（組み込み `node:test` による 15 件のテスト）
+> 外部依存ライブラリを一切増やさず、高い品質とデグレード防止を保証するため、以下の観点を網羅する 15 件の単体テストを追加しています：
+> - **プラン・バケット解析**: 5時間枠と週間枠の両方の正確なパース、5時間枠のみのプランへの柔軟な適応、未定義・空データの安全なハンドリング。
+> - **フォールバック耐性**: 万が一 `RetrieveUserQuotaSummary` がタイムアウトやエラーで失敗しても、エラーでクラッシュすることなく既存の `GetUserStatus` のモデルデータのみで動作を継続することの検証。
+> - **ステータスバーのフォーマット**: 複数バケット文字列、単一バケット文字列、状態アイコン（通常、20%未満の警告アイコン、枯渇時のエラーアイコン）の描画。
+> - **ピン留め・フィルタリング**: 短縮名（`Claude/GPT`, `GPT`, `Claude`）や完全名、未指定（全許可）などでの柔軟なグループ表示/非表示フィルタの検証。
+> - **メニューの親子構造（QuickPick）**: チェックマーク付きの親行と、インデントされた縦並びプログレスバー・リセット時間を持つ子行が正確に構築されることの検証。
+> - **UI ユーティリティ**: プログレスバー描画（0%, 50%, 100%）、リセット残り時間のフォーマット、従来通りのモデル略称生成ロジックの担保。
+> 
+> #### 4. 実装の準備状況
+> すでに手元の Windows x64 Antigravity 言語サーバー実プロセス環境にて動作検証を完了しています。
+> 
+> この機能について Pull Request をレビューしていただけそうでしょうか？方向性に問題がなさそうでしたら、喜んで PR を提出させていただきます！
+
+---
+
+## 7. 本家（upstream）向け PR ドラフト (English PR Draft & 日本語対訳)
+
+Issue で合意が得られた後に提出する Pull Request のドラフトです。
+
+### 7.1 Title（件名）
+```text
 feat: support weekly and 5-hour quota groups via RetrieveUserQuotaSummary
 ```
 
-### Description
+### 7.2 Description（本文・英語）
 ```markdown
 ## Summary
 This PR adds support for retrieving and displaying both **5-Hour** and **Weekly** shared quota limits for model groups (Gemini Models, Claude and GPT models), matching the detailed quota view found in Antigravity IDE's native "Settings > Models" page.
+
+Resolves / Implements the proposal discussed in #(Issue番号).
 
 ## Motivation & Problem
 Currently, AGQ fetches quota data solely through `GetUserStatus`. However, this approach has two major limitations:
@@ -243,7 +337,7 @@ Exposing the underlying shared quota groups directly solves this redundancy and 
    - Group short name uses `Claude/GPT` to clearly reflect that GPT-OSS shares the Claude pool.
 6. **Zero-Dependency Automated Tests**:
    - Added 15 comprehensive unit tests covering parsing, fallback handling, group filtering, formatting, and menu construction using Node.js built-in `node:test`.
-7. **Robust Fallback**: If `RetrieveUserQuotaSummary` fails or is unavailable on older builds, the extension smoothly falls back to individual model tracking.
+7. **Robust Fallback**: If `RetrieveUserQuotaSummary` fails or is unavailable on older builds, the extension smoothly falls back to individual model tracking without breaking.
 
 ## Verification
 - Verified against live Antigravity Language Server on Windows x64.
@@ -251,3 +345,35 @@ Exposing the underlying shared quota groups directly solves this redundancy and 
 - Clean TypeScript build (`npm run compile`).
 - Verified status bar display switching, menu interactions, and settings reactivity.
 ```
+
+### 7.3 日本語対訳（PR）
+
+> #### 概要
+> 本 PR は、Antigravity IDE 本体の「Settings > Models」ページに表示されている詳細ビューと同様に、モデルグループ（Gemini Models、Claude and GPT models）の **5時間枠** および **週間枠** の両方の共有クォータ制限を取得・表示する機能を追加します。
+> 
+> Issue #(Issue番号) で議論された提案を実装するものです。
+> 
+> #### 動機と課題
+> 現在、AGQ は `GetUserStatus` のみでクォータを取得しています。しかし、この方法には2つの大きな制約があります：
+> 1. **単一枠の制約**: `GetUserStatus` はモデルごとに直近の1つの枠しか公開しないため（Gemini は 5時間枠のみ、Claude は 1週間枠のみ）、Pro 等のユーザーが週間制限を追跡できません。
+> 2. **モデル間の重複**: 同系統のモデル（Gemini 3.5, 3.7, 3.8 の Flash や Pro 等）は裏側で同一グループのクォータプールを共有しているため、個別のモデルを並べても同じパーセントが重複するだけです。
+> 
+> 基礎となる共有グループを直接公開することで、この重複を解消し、5時間バースト枠と週間枠の両方を完全に可視化します。
+> 
+> #### 変更点と実装内容
+> 1. **エンドポイントの統合**: `QuotaManager` にて `Promise.allSettled` を用い、`GetUserStatus` と並行して `/RetrieveUserQuotaSummary` を呼び出し。
+> 2. **型定義**: `src/utils/types.ts` に `quota_group_info`、`quota_bucket_info`、`display_mode` を追加。
+> 3. **動的バケット描画**: 固定的なリミットを仮定せず、ユーザーのプランに応じて返されたバケット（`5h`、`weekly` 等）に柔軟に適応。
+> 4. **メニュー UI の強化**: QuickPick メニュー上部に「Quota Groups (Toggle Pin)」セクションを追加。1つのチェックマークとインデントされた縦並びのプログレスバーで各リミットを表示し、クリックでトグル可能に。
+> 5. **柔軟なステータスバー設定**:
+>    - `agq.displayMode`: `"models"`（初期値、100% 後方互換）、`"groups"`（共有 5h/1w 表示）、`"both"`。
+>    - `agq.pinnedGroups`: 表示するグループの絞り込み（例: `["Gemini"]`）。
+>    - 短縮名を `Claude/GPT` とし、GPT-OSS が同枠であることを明示。
+> 6. **外部依存ゼロの自動テスト**: Node.js 組み込みの `node:test` を使用し、パース、フォールバック、フィルタ、メニュー構築を網羅する 15 件の単体テストを追加。
+> 7. **堅牢なフォールバック**: 万が一 `RetrieveUserQuotaSummary` が失敗した場合でも、個別モデル追跡へと自動フォールバック。
+> 
+> #### 検証結果
+> - Windows x64 の Antigravity 言語サーバー実プロセスにて動作確認済み。
+> - 単体テスト 15 件すべて PASS（`npm run test`）。
+> - TypeScript コンパイル通過（`npm run compile`）。
+> - ステータスバー切り替え、メニュー操作、設定変更の即時反映を確認済み。
