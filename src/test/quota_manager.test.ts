@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
-import { format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned, get_group_short_name } from '../ui/status_bar';
-import { server_user_status_response, server_user_quota_summary_response, quota_group_info } from '../utils/types';
+import { StatusBarManager, format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned, get_group_short_name } from '../ui/status_bar';
+import { server_user_status_response, server_user_quota_summary_response, quota_group_info, quota_snapshot } from '../utils/types';
 
 describe('QuotaManager - parse_quota_groups', () => {
 	const qm = new QuotaManager();
@@ -288,11 +288,65 @@ describe('UI Utilities', () => {
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Gemini']), false);
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude']), true);
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude and GPT models']), true);
+		assert.strictEqual(is_group_pinned('Claude and GPT models', ['GPT']), true);
+		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude/GPT']), true);
 		assert.strictEqual(is_group_pinned('Gemini Models', ['none']), false);
 	});
 
 	it('should get short name for quota groups', () => {
 		assert.strictEqual(get_group_short_name('Gemini Models'), 'Gemini');
 		assert.strictEqual(get_group_short_name('Claude and GPT models'), 'Claude/GPT');
+	});
+});
+describe('StatusBarManager - build_menu_items', () => {
+	it('should format unified group items with progress bars and descriptions', () => {
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [],
+			groups: [
+				{
+					display_name: 'Gemini Models',
+					buckets: [
+						{
+							bucket_id: 'gemini-5h',
+							display_name: 'Five Hour Limit',
+							window: '5h',
+							remaining_fraction: 0.7,
+							remaining_percentage: 70,
+							is_exhausted: false,
+							reset_time: new Date(),
+							time_until_reset: 1000,
+							time_until_reset_formatted: '3h',
+						},
+						{
+							bucket_id: 'gemini-weekly',
+							display_name: 'Weekly Limit',
+							window: 'weekly',
+							remaining_fraction: 0.8,
+							remaining_percentage: 80,
+							is_exhausted: false,
+							reset_time: new Date(),
+							time_until_reset: 1000,
+							time_until_reset_formatted: '3d',
+						},
+					],
+				},
+			],
+		};
+
+		sb.update(snapshot, false, 'groups');
+		const items = sb.build_menu_items();
+
+		// Check section header
+		assert.ok(items.some(i => i.label === 'Quota Groups (Toggle Pin)'));
+
+		// Check unified group item
+		const geminiItem = items.find(i => (i as any).group_name === 'Gemini');
+		assert.ok(geminiItem);
+		assert.ok(geminiItem.label.includes('Gemini Models'));
+		assert.strictEqual(geminiItem.description, '[5h: 70% | 1w: 80%]');
+		assert.ok(geminiItem.detail?.includes('5h: ▓▓▓▓▓▓▓░░░ 70.0% (3h)'));
+		assert.ok(geminiItem.detail?.includes('Weekly: ▓▓▓▓▓▓▓▓░░ 80.0% (3d)'));
 	});
 });
