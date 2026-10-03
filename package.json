@@ -95,7 +95,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
-    "test": "npm run compile && node -r ./src/test/setup.js --test \"export/test/**/*.test.js\""
+    "test": "npm run compile && node src/test/run.js"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
