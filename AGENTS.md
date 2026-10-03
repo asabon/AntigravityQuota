@@ -55,10 +55,16 @@
 ### 1. ブランチの役割
 - **`develop`（保護・統合本線ブランチ）**:
   - 開発のベースラインとなる保護ブランチ。`AGENTS.md` や `.agents/` などの AI ハーネス環境が常備されています。
-  - ⚠️ **`develop` への直接 commit / push は禁止**。必ず `feature/` ブランチから PR を作成し、**Squash & Merge** でマージします。
-- **`feature/<topic-name>`（機能開発・作業ブランチ）**:
-  - `develop` から分岐して日々の作業を行うトピックブランチ。実装、デバッグ、テスト、WIP コミットはすべてここで行います。
-  - 作業完了後、`develop` 宛てに PR を作成し、Squash & Merge します。
+  - ⚠️ **`develop` への直接 commit / push は禁止**。必ずトピックブランチから PR を作成し、**Squash & Merge** でマージします。
+- **`feature/<topic-name>` / `fix/<topic-name>`（本家還元コード開発ブランチ）**:
+  - `develop` から分岐して本家還元用のコード（`src/` 配下等）を修正するブランチ。
+  - 🚫 **ハーネス（`AGENTS.md`, `.agents/`, `.github/`）やドキュメント（`docs/`）の変更は禁止**（CI で自動ブロック）。
+- **`docs/<topic-name>`（設計提案書・ドキュメントブランチ）**:
+  - 提案書（`docs/proposals/`）等のドキュメントを作成・更新するブランチ。
+  - 🚫 **プロダクションコード（`src/`）の変更は禁止**（CI で自動ブロック）。
+- **`chore/<topic-name>`（環境整備・AI ハーネスブランチ）**:
+  - CI ワークフロー、スクリプト、`AGENTS.md` などのローカル環境を改善するブランチ。
+  - 🚫 **プロダクションコード（`src/`）の変更は禁止**（CI で自動ブロック）。
 - **`upstream/main`（本家の追跡）**:
   - 本家の最新状態を同期するための読み取り専用ブランチ。直接コミットしてはなりません。
 - **`origin/main`（Fork の main / 本家ミラー）**:
@@ -66,12 +72,18 @@
 - **`pr/<topic-name>`（本家提出用 PR ブランチ）**:
   - 本家へ PR を出す際、**一時的に `upstream/main` から作成する専用ブランチ**。`develop` に Squash & Merge された 1 コミットのみを cherry-pick して作成します。
 
-### 2. コミット・ブランチ分離の原則（ハーネス・ドキュメント混入の厳格防止）
+### 2. コミット・ブランチ分離の原則（CI による機械的強制）
 Squash & Merge を行うと、ブランチ内の全コミットが 1 つに統合されます。
-そのため、以下の原則を厳守してください：
+そのため、本家への cherry-pick 時に手作業での除外や混入事故を恒久的に防ぐため、**ブランチ種別ごとに変更可能なファイルを GitHub Actions CI で厳格に検査・遮断**します。
 
-- **本家還元コード**（`src/` 配下などの修正）と **ローカルハーネス・ドキュメント**（`AGENTS.md`, `.agents/`, `docs/` 等）の変更は、**同一 PR で混ぜずにブランチを分ける**こと。
-  - 理由: ドキュメントやハーネスが混ざったまま Squash されると、本家向け PR ブランチへの cherry-pick 時に手作業で除外・修正する手間や混入事故が発生します。
+| ブランチ種別 | プレフィックス | 変更を許可するファイル | 変更を禁止するファイル（CI でブロック） |
+| :--- | :--- | :--- | :--- |
+| **本家還元コード** | `feature/*`<br>`fix/*` | `src/**`, `package.json`, `.vscodeignore` 等 | 🚫 `AGENTS.md`<br>🚫 `.agents/**`<br>🚫 `docs/**`<br>🚫 `.github/**` |
+| **設計・提案書** | `docs/*` | `docs/**` | 🚫 `src/**` |
+| **環境・ハーネス** | `chore/*` | `AGENTS.md`, `.agents/**`, `.github/**` 等 | 🚫 `src/**` |
+
+> 🚨 **CI による自動チェック**:
+> `develop` 宛ての PR では、`.agents/scripts/check-branch-isolation.mjs` が自動実行され、禁止ファイルが含まれている場合は CI が失敗（Exit code 1）してマージが遮断されます。ローカルでも `node .agents/scripts/check-branch-isolation.mjs` で検証可能です。
 
 ### 3. 日常の開発・マージフロー（feature → develop）
 
@@ -172,6 +184,10 @@ git push origin develop
 - **日本語混入チェック (`src/` 配下)**:
   ```powershell
   node .agents/scripts/check-no-japanese.mjs --all
+  ```
+- **ブランチ分離チェック（PR 前確認）**:
+  ```powershell
+  node .agents/scripts/check-branch-isolation.mjs
   ```
 - **拡張機能パッケージング確認（必要時）**:
   ```powershell

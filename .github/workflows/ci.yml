@@ -15,12 +15,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Verify Branch Isolation
+        if: github.event_name == 'pull_request'
+        run: node .agents/scripts/check-branch-isolation.mjs --branch "${{ github.head_ref }}" --base "origin/${{ github.base_ref }}"
 
       - name: Install dependencies
         run: npm ci
