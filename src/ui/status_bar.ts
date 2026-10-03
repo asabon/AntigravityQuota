@@ -47,6 +47,7 @@ export function get_abbreviation(label: string): string {
 export function get_group_short_name(group_name: string): string {
 	const lower = group_name.toLowerCase();
 	if (lower.includes('gemini')) return 'Gemini';
+	if (lower.includes('claude') && lower.includes('gpt')) return 'Claude/GPT';
 	if (lower.includes('claude')) return 'Claude';
 	if (lower.includes('gpt')) return 'GPT';
 	return group_name.split(/\s+/)[0] || group_name;
@@ -89,7 +90,7 @@ export function is_group_pinned(group_name: string, pinned_groups: string[]): bo
 	const full_name = group_name.toLowerCase();
 	return pinned_groups.some(p => {
 		const target = p.toLowerCase();
-		return target === short_name || target === full_name;
+		return target === short_name || target === full_name || full_name.includes(target);
 	});
 }
 

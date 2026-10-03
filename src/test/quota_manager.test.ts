@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
-import { format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned } from '../ui/status_bar';
+import { format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned, get_group_short_name } from '../ui/status_bar';
 import { server_user_status_response, server_user_quota_summary_response, quota_group_info } from '../utils/types';
 
 describe('QuotaManager - parse_quota_groups', () => {
@@ -234,7 +234,7 @@ describe('StatusBar Formatting - format_group_status', () => {
 		};
 
 		const formatted = format_group_status(group);
-		assert.strictEqual(formatted, '$(warning) Claude [1w: 15%]');
+		assert.strictEqual(formatted, '$(warning) Claude/GPT [1w: 15%]');
 	});
 
 	it('should show error icon when quota is exhausted', () => {
@@ -289,5 +289,10 @@ describe('UI Utilities', () => {
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude']), true);
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude and GPT models']), true);
 		assert.strictEqual(is_group_pinned('Gemini Models', ['none']), false);
+	});
+
+	it('should get short name for quota groups', () => {
+		assert.strictEqual(get_group_short_name('Gemini Models'), 'Gemini');
+		assert.strictEqual(get_group_short_name('Claude and GPT models'), 'Claude/GPT');
 	});
 });
