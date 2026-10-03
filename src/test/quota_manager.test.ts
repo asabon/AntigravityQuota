@@ -298,8 +298,9 @@ describe('UI Utilities', () => {
 		assert.strictEqual(get_group_short_name('Claude and GPT models'), 'Claude/GPT');
 	});
 });
+
 describe('StatusBarManager - build_menu_items', () => {
-	it('should format unified group items with progress bars and descriptions', () => {
+	it('should format group parent and child bucket items correctly', () => {
 		const sb = new StatusBarManager();
 		const snapshot: quota_snapshot = {
 			timestamp: new Date(),
@@ -308,17 +309,6 @@ describe('StatusBarManager - build_menu_items', () => {
 				{
 					display_name: 'Gemini Models',
 					buckets: [
-						{
-							bucket_id: 'gemini-5h',
-							display_name: 'Five Hour Limit',
-							window: '5h',
-							remaining_fraction: 0.7,
-							remaining_percentage: 70,
-							is_exhausted: false,
-							reset_time: new Date(),
-							time_until_reset: 1000,
-							time_until_reset_formatted: '3h',
-						},
 						{
 							bucket_id: 'gemini-weekly',
 							display_name: 'Weekly Limit',
@@ -329,6 +319,17 @@ describe('StatusBarManager - build_menu_items', () => {
 							reset_time: new Date(),
 							time_until_reset: 1000,
 							time_until_reset_formatted: '3d',
+						},
+						{
+							bucket_id: 'gemini-5h',
+							display_name: 'Five Hour Limit',
+							window: '5h',
+							remaining_fraction: 0.7,
+							remaining_percentage: 70,
+							is_exhausted: false,
+							reset_time: new Date(),
+							time_until_reset: 1000,
+							time_until_reset_formatted: '3h',
 						},
 					],
 				},
@@ -341,12 +342,20 @@ describe('StatusBarManager - build_menu_items', () => {
 		// Check section header
 		assert.ok(items.some(i => i.label === 'Quota Groups (Toggle Pin)'));
 
-		// Check unified group item
-		const geminiItem = items.find(i => (i as any).group_name === 'Gemini');
-		assert.ok(geminiItem);
-		assert.ok(geminiItem.label.includes('Gemini Models'));
-		assert.strictEqual(geminiItem.description, '[5h: 70% | 1w: 80%]');
-		assert.ok(geminiItem.detail?.includes('5h: ▓▓▓▓▓▓▓░░░ 70.0% (3h)'));
-		assert.ok(geminiItem.detail?.includes('Weekly: ▓▓▓▓▓▓▓▓░░ 80.0% (3d)'));
+		// Check parent group item with checkmark
+		const parentItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('Gemini Models'));
+		assert.ok(parentItem);
+		assert.ok(parentItem.label.includes('$(check)'));
+
+		// Check child bucket items
+		const weeklyItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('Weekly:'));
+		assert.ok(weeklyItem);
+		assert.ok(weeklyItem.label.includes('▓▓▓▓▓▓▓▓░░ 80.0%'));
+		assert.strictEqual(weeklyItem.description, 'Resets in: 3d');
+
+		const fiveHourItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('5-Hour:'));
+		assert.ok(fiveHourItem);
+		assert.ok(fiveHourItem.label.includes('▓▓▓▓▓▓▓░░░ 70.0%'));
+		assert.strictEqual(fiveHourItem.description, 'Resets in: 3h');
 	});
 });

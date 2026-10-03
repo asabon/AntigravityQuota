@@ -304,30 +304,27 @@ export class StatusBarManager {
 					? '$(warning)'
 					: '';
 
-				const summary = group.buckets
-					.map(b => {
-						const label = b.window === 'weekly' ? '1w' : b.window;
-						const pct = b.remaining_percentage !== undefined ? `${b.remaining_percentage.toFixed(0)}%` : 'N/A';
-						return `${label}: ${pct}`;
-					})
-					.join(' | ');
-
-				const detail = group.buckets
-					.map(b => {
-						const pct = b.remaining_percentage !== undefined ? `${b.remaining_percentage.toFixed(1)}%` : 'N/A';
-						const bar = b.remaining_percentage !== undefined ? draw_progress_bar(b.remaining_percentage) : '░'.repeat(10);
-						const window_label = b.window === 'weekly' ? 'Weekly' : b.window === '5h' ? '5h' : b.display_name;
-						return `${window_label}: ${bar} ${pct} (${b.time_until_reset_formatted})`;
-					})
-					.join('   •   ');
-
-				const item: vscode.QuickPickItem & {group_name?: string} = {
+				// Parent Header Item with Checkmark
+				const parent_item: vscode.QuickPickItem & {group_name?: string} = {
 					label: `${selection_icon} ${status_icon ? status_icon + ' ' : ''}${group.display_name}`,
-					description: `[${summary}]`,
-					detail: `   ${detail}`,
 				};
-				item.group_name = short_name;
-				items.push(item);
+				parent_item.group_name = short_name;
+				items.push(parent_item);
+
+				// Child Bucket Items (Indented, vertical progress bars)
+				for (const bucket of group.buckets) {
+					const pct = bucket.remaining_percentage;
+					const pct_display = pct !== undefined ? `${pct.toFixed(1)}%` : 'N/A';
+					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);
+					const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
+
+					const child_item: vscode.QuickPickItem & {group_name?: string} = {
+						label: `      ${window_label}: ${bar} ${pct_display}`,
+						description: `Resets in: ${bucket.time_until_reset_formatted}`,
+					};
+					child_item.group_name = short_name;
+					items.push(child_item);
+				}
 			}
 		}
 
