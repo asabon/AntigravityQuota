@@ -165,6 +165,10 @@ git push origin develop
   ```powershell
   npm run lint
   ```
+- **単体テスト実行**:
+  ```powershell
+  npm run test
+  ```
 - **日本語混入チェック (`src/` 配下)**:
   ```powershell
   node .agents/scripts/check-no-japanese.mjs --all
@@ -173,6 +177,22 @@ git push origin develop
   ```powershell
   npm run node:vsix:package
   ```
+
+---
+
+## 🔍 GitHub Actions CI & 警告（Warnings/Annotations）監視ルール
+
+GitHub Actions による CI 実行結果を確認する際は、単にジョブの「成功・失敗（Success / Failure）」を見るだけでなく、**警告（Annotations, Deprecation Warnings, Runner Notices）の有無を必ず確認し、警告があれば修正を提案・実施する**こと。
+
+1. **警告の確認方法**:
+   - `gh pr checks` や `gh run view <RUN_ID>` の出力において、`ANNOTATIONS` や `Warning:`、非推奨メッセージの有無を確認する。
+2. **対象となる警告の例**:
+   - ランタイムや Action の非推奨警告（例: `Node.js 20 is deprecated... forced to run on Node.js 24`, `actions/checkout@v4` → `@v5` へのアップグレード推奨）。
+   - パッケージやツールの非推奨警告、依存関係の脆弱性通知。
+   - OS ランナー環境の移行予告（例: Ubuntu runner バージョン更新等）。
+3. **対応方針**:
+   - 非推奨（Deprecation）や設定上の問題による警告は放置せず、速やかに修正コミットを作成して解消する。
+   - プラットフォーム全体の移行予告についても、影響有無を調査しユーザーに報告・提案する。
 
 ---
 
