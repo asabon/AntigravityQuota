@@ -285,25 +285,48 @@ export class StatusBarManager {
 				const is_pinned = is_group_pinned(group.display_name, pinned_groups);
 				const selection_icon = is_pinned ? '$(check)' : '$(circle-outline)';
 
-				for (let i = 0; i < group.buckets.length; i++) {
-					const bucket = group.buckets[i];
-					const pct = bucket.remaining_percentage;
-					const pct_display = pct !== undefined ? `${pct.toFixed(1)}%` : 'N/A';
-					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);
-					const status_icon = bucket.is_exhausted
-						? '$(error)'
-						: pct !== undefined && pct < 20
-						? '$(warning)'
-						: '';
+				let has_exhausted = false;
+				let min_pct: number | undefined;
 
-					const item: vscode.QuickPickItem & {group_name?: string} = {
-						label: `${i === 0 ? selection_icon : '   '} ${status_icon ? status_icon + ' ' : ''}${group.display_name} - ${bucket.display_name}`,
-						description: `${bar} ${pct_display}`,
-						detail: `      Resets in: ${bucket.time_until_reset_formatted}`,
-					};
-					item.group_name = short_name;
-					items.push(item);
+				for (const b of group.buckets) {
+					if (b.is_exhausted) has_exhausted = true;
+					if (b.remaining_percentage !== undefined) {
+						if (min_pct === undefined || b.remaining_percentage < min_pct) {
+							min_pct = b.remaining_percentage;
+						}
+					}
 				}
+
+				const status_icon = has_exhausted
+					? '$(error)'
+					: min_pct !== undefined && min_pct < 20
+					? '$(warning)'
+					: '';
+
+				const summary = group.buckets
+					.map(b => {
+						const label = b.window === 'weekly' ? '1w' : b.window;
+						const pct = b.remaining_percentage !== undefined ? `${b.remaining_percentage.toFixed(0)}%` : 'N/A';
+						return `${label}: ${pct}`;
+					})
+					.join(' | ');
+
+				const detail = group.buckets
+					.map(b => {
+						const pct = b.remaining_percentage !== undefined ? `${b.remaining_percentage.toFixed(1)}%` : 'N/A';
+						const bar = b.remaining_percentage !== undefined ? draw_progress_bar(b.remaining_percentage) : '░'.repeat(10);
+						const window_label = b.window === 'weekly' ? 'Weekly' : b.window === '5h' ? '5h' : b.display_name;
+						return `${window_label}: ${bar} ${pct} (${b.time_until_reset_formatted})`;
+					})
+					.join('   •   ');
+
+				const item: vscode.QuickPickItem & {group_name?: string} = {
+					label: `${selection_icon} ${status_icon ? status_icon + ' ' : ''}${group.display_name}`,
+					description: `[${summary}]`,
+					detail: `   ${detail}`,
+				};
+				item.group_name = short_name;
+				items.push(item);
 			}
 		}
 
