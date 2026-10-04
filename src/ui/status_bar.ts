@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import {quota_snapshot, model_quota_info, quota_group_info, display_mode} from '../utils/types';
+import {quota_snapshot, model_quota_info, quota_group_info, quota_bucket_info, display_mode} from '../utils/types';
 import {calculate_weekly_pace} from '../core/pace_calculator';
 
 /** Mapping of model labels to short abbreviations for status bar display */
@@ -54,6 +54,15 @@ export function get_group_short_name(group_name: string): string {
 	return group_name.split(/\s+/)[0] || group_name;
 }
 
+/** Sort quota buckets so shorter windows appear first (e.g. 5h before weekly) */
+export function sort_buckets(buckets: quota_bucket_info[]): quota_bucket_info[] {
+	return [...buckets].sort((a, b) => {
+		const order_a = a.window === '5h' ? 1 : a.window === 'weekly' ? 2 : 99;
+		const order_b = b.window === '5h' ? 1 : b.window === 'weekly' ? 2 : 99;
+		return order_a - order_b;
+	});
+}
+
 /** Format a single quota group into status bar string */
 export function format_group_status(group: quota_group_info, show_pace_indicator: boolean = true): string {
 	const short_name = get_group_short_name(group.display_name);
@@ -62,7 +71,7 @@ export function format_group_status(group: quota_group_info, show_pace_indicator
 	let min_pct: number | undefined;
 	let has_exhausted = false;
 
-	for (const b of group.buckets) {
+	for (const b of sort_buckets(group.buckets)) {
 		const pct = b.remaining_percentage;
 		if (b.is_exhausted) has_exhausted = true;
 		if (pct !== undefined) {
@@ -196,7 +205,7 @@ export class StatusBarManager {
 					: group.display_name;
 				md.appendMarkdown(`**${group_header}**\n`);
 
-				for (const bucket of group.buckets) {
+				for (const bucket of sort_buckets(group.buckets)) {
 					const pct = bucket.remaining_percentage !== undefined
 						? `${bucket.remaining_percentage.toFixed(0)}%`
 						: 'N/A';
@@ -389,7 +398,7 @@ export class StatusBarManager {
 				items.push(parent_item);
 
 				// Child Bucket Items (Indented, vertical progress bars)
-				for (const bucket of group.buckets) {
+				for (const bucket of sort_buckets(group.buckets)) {
 					const pct = bucket.remaining_percentage;
 					const pct_display = pct !== undefined ? `${pct.toFixed(1)}%` : 'N/A';
 					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);

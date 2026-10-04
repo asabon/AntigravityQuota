@@ -8,9 +8,10 @@ import {
 } from '../core/pace_calculator';
 import {
 	format_group_status,
+	sort_buckets,
 	StatusBarManager,
 } from '../ui/status_bar';
-import { quota_group_info, quota_snapshot } from '../utils/types';
+import { quota_bucket_info, quota_group_info, quota_snapshot } from '../utils/types';
 
 describe('PaceCalculator - calculate_weekly_pace', () => {
 	it('should return null when remaining_fraction is undefined', () => {
@@ -148,6 +149,29 @@ describe('StatusBar - format_group_status with pace indicator', () => {
 		const text = format_group_status(mock_group, false);
 		assert.ok(text.includes('1w: 80%'), `Expected text to include '1w: 80%', got: ${text}`);
 		assert.ok(!text.includes('🟢'), `Expected text not to include '🟢', got: ${text}`);
+	});
+
+	it('should always render 5h before weekly regardless of input bucket order', () => {
+		// Reverse order: weekly first, 5h second
+		const reverse_group: quota_group_info = {
+			display_name: 'Claude and GPT models',
+			buckets: [
+				mock_group.buckets[1], // weekly
+				mock_group.buckets[0], // 5h
+			],
+		};
+		const text = format_group_status(reverse_group, true);
+		assert.ok(text.includes('[5h: 95% | 1w: 80%🟢]'), `Expected 5h before weekly, got: ${text}`);
+	});
+
+	it('should sort buckets with shorter windows first via sort_buckets', () => {
+		const unsorted: quota_bucket_info[] = [
+			{ ...mock_group.buckets[1] }, // weekly
+			{ ...mock_group.buckets[0] }, // 5h
+		];
+		const sorted = sort_buckets(unsorted);
+		assert.strictEqual(sorted[0].window, '5h');
+		assert.strictEqual(sorted[1].window, 'weekly');
 	});
 });
 
