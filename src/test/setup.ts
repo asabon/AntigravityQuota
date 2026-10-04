@@ -9,6 +9,22 @@ const mockVscode = {
 	ThemeColor: class ThemeColor {
 		constructor(public id: string) {}
 	},
+	MarkdownString: class MarkdownString {
+		public value = '';
+		public isTrusted = false;
+		public supportThemeIcons = false;
+		constructor(value: string = '') {
+			this.value = value;
+		}
+		appendText(value: string) {
+			this.value += value;
+			return this;
+		}
+		appendMarkdown(value: string) {
+			this.value += value;
+			return this;
+		}
+	},
 	window: {
 		createStatusBarItem: () => ({
 			show: () => {},

@@ -191,7 +191,7 @@ describe('StatusBar Formatting - format_group_status', () => {
 		};
 
 		const formatted = format_group_status(group);
-		assert.strictEqual(formatted, '$(check) Gemini [5h: 96% | 1w: 84%]');
+		assert.strictEqual(formatted, '$(check) Gemini [5h: 96% | 1w: 84%🟢]');
 	});
 
 	it('should format group with single 5h bucket', () => {
@@ -235,7 +235,7 @@ describe('StatusBar Formatting - format_group_status', () => {
 		};
 
 		const formatted = format_group_status(group);
-		assert.strictEqual(formatted, '$(warning) Claude/GPT [1w: 15%]');
+		assert.strictEqual(formatted, '$(warning) Claude/GPT [1w: 15%🟢]');
 	});
 
 	it('should show error icon when quota is exhausted', () => {

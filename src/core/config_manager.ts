@@ -18,6 +18,7 @@ export class ConfigManager {
 			polling_interval: Math.max(30, config.get<number>('pollingInterval', 120)) * 1000,
 			show_prompt_credits: config.get<boolean>('showPromptCredits', false),
 			display_mode: config.get<any>('displayMode', 'models'),
+			show_weekly_pace_indicator: config.get<boolean>('showWeeklyPaceIndicator', true),
 		};
 	}
 
