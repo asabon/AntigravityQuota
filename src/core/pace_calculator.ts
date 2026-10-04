@@ -44,6 +44,27 @@ export function calculate_weekly_pace(
 		};
 	}
 
+	// Full quota guard: 100% remaining means zero quota used, always ahead of pace
+	if (remaining_fraction >= 1.0) {
+		return {
+			status: 'ahead',
+			emoji: '🟢',
+			buffer_percentage,
+			target_quota_percentage,
+		};
+	}
+
+	// Near-full ceiling: if remaining quota is >= 95% and at or above linear target,
+	// user is in a safe surplus state (resolves the 100% ceiling limitation near cycle start).
+	if (current_quota_percentage >= 95 && buffer_percentage >= 0) {
+		return {
+			status: 'ahead',
+			emoji: '🟢',
+			buffer_percentage,
+			target_quota_percentage,
+		};
+	}
+
 	if (buffer_percentage >= PACE_BUFFER_THRESHOLD) {
 		return {
 			status: 'ahead',

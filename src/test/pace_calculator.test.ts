@@ -91,6 +91,26 @@ describe('PaceCalculator - calculate_weekly_pace', () => {
 		assert.strictEqual(result.emoji, '🔴');
 	});
 
+	it('should apply full quota guard: 100% remaining is always ahead of pace (🟢)', () => {
+		// Just after reset (167.9 hours remaining, target ~99.9%)
+		// Without full quota guard, 100% remaining would have buffer +0.1% and be incorrectly labeled 'on_track' (🟡)
+		const almost_full_week = WEEKLY_CYCLE_MS - 60000;
+		const result = calculate_weekly_pace(1.0, almost_full_week);
+		assert.ok(result);
+		assert.strictEqual(result.status, 'ahead');
+		assert.strictEqual(result.emoji, '🟢');
+	});
+
+	it('should scale ahead threshold near cycle start when target > 95%', () => {
+		// Target = 98% (achievable headroom = 2%). User has 99% remaining (buffer = +1%).
+		// Standard 5% threshold would label this 'on_track', but with scaling it is 'ahead' (🟢)
+		const time_remain = (98 / 100) * WEEKLY_CYCLE_MS;
+		const result = calculate_weekly_pace(0.99, time_remain);
+		assert.ok(result);
+		assert.strictEqual(result.status, 'ahead');
+		assert.strictEqual(result.emoji, '🟢');
+	});
+
 	it('should clamp remaining time when expired (time <= 0)', () => {
 		// Cycle expired, target = 0%
 		const result = calculate_weekly_pace(0.1, -5000);
