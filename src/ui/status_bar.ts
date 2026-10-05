@@ -172,6 +172,12 @@ export class StatusBarManager {
 		this.item.show();
 	}
 
+	refresh_cached_snapshot(show_credits: boolean, mode?: display_mode) {
+		if (this.last_snapshot) {
+			this.update(this.last_snapshot, show_credits, mode);
+		}
+	}
+
 	show_menu() {
 		const pick = vscode.window.createQuickPick();
 		pick.title = 'Antigravity Quota';
@@ -190,7 +196,10 @@ export class StatusBarManager {
 
 		pick.onDidAccept(async () => {
 			if (currentActiveItem && 'group_name' in currentActiveItem) {
-				await this.toggle_pinned_group((currentActiveItem as any).group_name);
+				await this.toggle_pinned_group(
+					(currentActiveItem as any).group_name,
+					(currentActiveItem as any).group_display_name
+				);
 				pick.items = this.build_menu_items();
 				if (this.last_snapshot) {
 					const config = vscode.workspace.getConfiguration('agq');
@@ -231,10 +240,11 @@ export class StatusBarManager {
 		return config.get<string[]>('pinnedGroups') || [];
 	}
 
-	private async toggle_pinned_group(group_key: string): Promise<void> {
+	private async toggle_pinned_group(group_key: string, group_display_name?: string): Promise<void> {
 		const config = vscode.workspace.getConfiguration('agq');
 		let pinned = [...(config.get<string[]>('pinnedGroups') || [])];
 		const all_groups = (this.last_snapshot?.groups || []).map(g => get_group_short_name(g.display_name));
+		const display_name = group_display_name || group_key;
 
 		if (pinned.length === 0) {
 			pinned = all_groups.filter(g => g.toLowerCase() !== group_key.toLowerCase());
@@ -242,9 +252,9 @@ export class StatusBarManager {
 				pinned = ['none'];
 			}
 		} else {
-			const index = pinned.findIndex(p => p.toLowerCase() === group_key.toLowerCase());
-			if (index >= 0) {
-				pinned.splice(index, 1);
+			const remaining = pinned.filter(p => !is_group_pinned(display_name, [p]));
+			if (remaining.length !== pinned.length) {
+				pinned = remaining;
 				if (pinned.length === 0) {
 					pinned = ['none'];
 				}
@@ -305,10 +315,11 @@ export class StatusBarManager {
 					: '';
 
 				// Parent Header Item with Checkmark
-				const parent_item: vscode.QuickPickItem & {group_name?: string} = {
+				const parent_item: vscode.QuickPickItem & {group_name?: string; group_display_name?: string} = {
 					label: `${selection_icon} ${status_icon ? status_icon + ' ' : ''}${group.display_name}`,
 				};
 				parent_item.group_name = short_name;
+				parent_item.group_display_name = group.display_name;
 				items.push(parent_item);
 
 				// Child Bucket Items (Indented, vertical progress bars)
@@ -318,11 +329,12 @@ export class StatusBarManager {
 					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);
 					const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
 
-					const child_item: vscode.QuickPickItem & {group_name?: string} = {
+					const child_item: vscode.QuickPickItem & {group_name?: string; group_display_name?: string} = {
 						label: `      ${window_label}: ${bar} ${pct_display}`,
 						description: `Resets in: ${bucket.time_until_reset_formatted}`,
 					};
 					child_item.group_name = short_name;
+					child_item.group_display_name = group.display_name;
 					items.push(child_item);
 				}
 			}

@@ -1,4 +1,4 @@
-import './setup';
+import { setMockConfig, resetMockConfig, getMockConfig } from './setup';
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
@@ -157,6 +157,31 @@ describe('QuotaManager - parse_response integration & fallback', () => {
 		assert.strictEqual(snapshot.models.length, 1);
 		assert.strictEqual(snapshot.models[0].label, 'Gemini 3.8 Flash (Low)');
 		assert.strictEqual(snapshot.groups, undefined);
+	});
+
+	it('should gracefully fallback when RetrieveUserQuotaSummary rejects during fetch_quota', async () => {
+		const qm_fetch = new QuotaManager();
+		(qm_fetch as any).request = async <T>(path: string): Promise<T> => {
+			if (path.includes('GetUserStatus')) {
+				return mockUserStatus as unknown as T;
+			}
+			if (path.includes('RetrieveUserQuotaSummary')) {
+				throw new Error('Endpoint not available');
+			}
+			throw new Error(`Unexpected path: ${path}`);
+		};
+
+		let received_snapshot: quota_snapshot | undefined;
+		qm_fetch.on_update(snapshot => {
+			received_snapshot = snapshot;
+		});
+
+		await qm_fetch.fetch_quota();
+
+		assert.ok(received_snapshot);
+		assert.strictEqual(received_snapshot.models.length, 1);
+		assert.strictEqual(received_snapshot.models[0].label, 'Gemini 3.8 Flash (Low)');
+		assert.strictEqual(received_snapshot.groups, undefined);
 	});
 });
 
@@ -347,16 +372,54 @@ describe('StatusBarManager - build_menu_items', () => {
 		const parentItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('Gemini Models'));
 		assert.ok(parentItem);
 		assert.ok(parentItem.label.includes('$(check)'));
+		assert.strictEqual((parentItem as any).group_display_name, 'Gemini Models');
 
 		// Check child bucket items
 		const weeklyItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('Weekly:'));
 		assert.ok(weeklyItem);
 		assert.ok(weeklyItem.label.includes('▓▓▓▓▓▓▓▓░░ 80.0%'));
 		assert.strictEqual(weeklyItem.description, 'Resets in: 3d');
+		assert.strictEqual((weeklyItem as any).group_display_name, 'Gemini Models');
 
 		const fiveHourItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('5-Hour:'));
 		assert.ok(fiveHourItem);
 		assert.ok(fiveHourItem.label.includes('▓▓▓▓▓▓▓░░░ 70.0%'));
 		assert.strictEqual(fiveHourItem.description, 'Resets in: 3h');
+		assert.strictEqual((fiveHourItem as any).group_display_name, 'Gemini Models');
+	});
+
+	it('should unpin groups matching by full name or substring in toggle_pinned_group', async () => {
+		resetMockConfig();
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [],
+			groups: [
+				{
+					display_name: 'Claude and GPT models',
+					buckets: [],
+				},
+				{
+					display_name: 'Gemini Models',
+					buckets: [],
+				},
+			],
+		};
+		sb.update(snapshot, false, 'groups');
+
+		// 1. Unpin when pinned via substring "GPT"
+		setMockConfig('pinnedGroups', ['GPT', 'Gemini']);
+		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
+		assert.deepStrictEqual(getMockConfig('pinnedGroups'), ['Gemini']);
+
+		// 2. Unpin when pinned via full name
+		setMockConfig('pinnedGroups', ['Claude and GPT models']);
+		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
+		assert.deepStrictEqual(getMockConfig('pinnedGroups'), ['none']);
+
+		// 3. Pin new group when not pinned
+		setMockConfig('pinnedGroups', ['Gemini']);
+		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
+		assert.deepStrictEqual(getMockConfig('pinnedGroups'), ['Gemini', 'Claude/GPT']);
 	});
 });
