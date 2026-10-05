@@ -2,6 +2,7 @@ import { setMockConfig, resetMockConfig, getMockConfig } from './setup';
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
+import { ConfigManager } from '../core/config_manager';
 import { StatusBarManager, format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned, get_group_short_name } from '../ui/status_bar';
 import { server_user_status_response, server_user_quota_summary_response, quota_group_info, quota_snapshot } from '../utils/types';
 
@@ -408,18 +409,51 @@ describe('StatusBarManager - build_menu_items', () => {
 		sb.update(snapshot, false, 'groups');
 
 		// 1. Unpin when pinned via substring "GPT"
-		setMockConfig('pinnedGroups', ['GPT', 'Gemini']);
+		setMockConfig('agq.pinnedGroups', ['GPT', 'Gemini']);
 		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
-		assert.deepStrictEqual(getMockConfig('pinnedGroups'), ['Gemini']);
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['Gemini']);
 
 		// 2. Unpin when pinned via full name
-		setMockConfig('pinnedGroups', ['Claude and GPT models']);
+		setMockConfig('agq.pinnedGroups', ['Claude and GPT models']);
 		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
-		assert.deepStrictEqual(getMockConfig('pinnedGroups'), ['none']);
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['none']);
 
 		// 3. Pin new group when not pinned
-		setMockConfig('pinnedGroups', ['Gemini']);
+		setMockConfig('agq.pinnedGroups', ['Gemini']);
 		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
-		assert.deepStrictEqual(getMockConfig('pinnedGroups'), ['Gemini', 'Claude/GPT']);
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['Gemini', 'Claude/GPT']);
+	});
+});
+
+describe('ConfigManager - legacy agQuota fallback', () => {
+	it('should read from agq when present', () => {
+		resetMockConfig();
+		setMockConfig('agq.enabled', false);
+		setMockConfig('agq.pollingInterval', 60);
+		setMockConfig('agq.showPromptCredits', true);
+		setMockConfig('agq.displayMode', 'groups');
+
+		const cm = new ConfigManager();
+		const config = cm.get_config();
+
+		assert.strictEqual(config.enabled, false);
+		assert.strictEqual(config.polling_interval, 60000);
+		assert.strictEqual(config.show_prompt_credits, true);
+		assert.strictEqual(config.display_mode, 'groups');
+	});
+
+	it('should gracefully fallback to agQuota when agq is unset', () => {
+		resetMockConfig();
+		setMockConfig('agQuota.enabled', false);
+		setMockConfig('agQuota.pollingInterval', 90);
+		setMockConfig('agQuota.showPromptCredits', true);
+
+		const cm = new ConfigManager();
+		const config = cm.get_config();
+
+		assert.strictEqual(config.enabled, false);
+		assert.strictEqual(config.polling_interval, 90000);
+		assert.strictEqual(config.show_prompt_credits, true);
+		assert.strictEqual(config.display_mode, 'models');
 	});
 });

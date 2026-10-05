@@ -96,6 +96,10 @@ export class QuotaManager {
 		}
 	}
 
+	/**
+	 * Fetch quota metrics concurrently from GetUserStatus and RetrieveUserQuotaSummary.
+	 * Falls back gracefully to model-only data if RetrieveUserQuotaSummary fails.
+	 */
 	async fetch_quota() {
 		try {
 			const metadata = {
@@ -159,6 +163,13 @@ export class QuotaManager {
 		return model.quotaInfo ?? model.quota_info;
 	}
 
+	/**
+	 * Parse quota group limits and buckets (e.g. 5h and weekly) from RetrieveUserQuotaSummary response.
+	 *
+	 * @param data Raw response from RetrieveUserQuotaSummary
+	 * @param now Reference timestamp for reset duration calculation
+	 * @returns List of parsed quota groups or undefined if unavailable
+	 */
 	public parse_quota_groups(
 		data?: server_user_quota_summary_response,
 		now: Date = new Date()
@@ -213,6 +224,14 @@ export class QuotaManager {
 		return groups.length > 0 ? groups : undefined;
 	}
 
+	/**
+	 * Parse combined response from GetUserStatus and optional RetrieveUserQuotaSummary into a unified snapshot.
+	 *
+	 * @param data Response payload from GetUserStatus
+	 * @param quota_summary Optional response payload from RetrieveUserQuotaSummary
+	 * @param now Reference timestamp for calculations
+	 * @returns A consolidated quota snapshot
+	 */
 	public parse_response(
 		data: server_user_status_response,
 		quota_summary?: server_user_quota_summary_response,
@@ -288,6 +307,13 @@ export class QuotaManager {
 		};
 	}
 
+	/**
+	 * Format remaining duration and exact reset timestamp into a user-friendly string.
+	 *
+	 * @param ms Remaining time in milliseconds
+	 * @param reset_time Target reset timestamp
+	 * @returns Human-readable duration string (e.g. "2h 30m (05/10/2026 14:00)")
+	 */
 	public format_time(ms: number, reset_time: Date): string {
 		if (ms <= 0) return 'Ready';
 		const mins = Math.ceil(ms / 60000);
@@ -314,6 +340,12 @@ export class QuotaManager {
 	}
 }
 
+/**
+ * Guard against negative remaining time values.
+ *
+ * @param diff Remaining milliseconds
+ * @returns Non-negative difference in milliseconds
+ */
 function quota_info_diff(diff: number): number {
 	return diff > 0 ? diff : 0;
 }

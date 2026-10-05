@@ -47,13 +47,21 @@ const mockVscode = {
 		}),
 	},
 	workspace: {
-		getConfiguration: () => ({
+		getConfiguration: (section?: string) => ({
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			get: (key: string, defaultValue: any) => (key in configStore ? configStore[key] : defaultValue),
+			get: (key: string, defaultValue: any) => {
+				const fullKey = section ? `${section}.${key}` : key;
+				if (fullKey in configStore) return configStore[fullKey];
+				if (key in configStore) return configStore[key];
+				return defaultValue;
+			},
 			update: async (key: string, value: any) => {
+				const fullKey = section ? `${section}.${key}` : key;
+				configStore[fullKey] = value;
 				configStore[key] = value;
 			},
 		}),
+		onDidChangeConfiguration: () => ({ dispose: () => {} }),
 	},
 	commands: {
 		registerCommand: () => ({ dispose: () => {} }),

@@ -16,6 +16,11 @@ let status_bar: StatusBarManager;
 let is_initialized = false;
 let is_reconnecting = false;
 
+/**
+ * Activate the Antigravity Quota extension.
+ *
+ * @param context VS Code extension context
+ */
 export async function activate(context: vscode.ExtensionContext) {
 	logger.init(context);
 	logger.section('Extension', 'Antigravity Quota Activating');
@@ -127,6 +132,9 @@ export async function activate(context: vscode.ExtensionContext) {
 	logger.info('Extension', 'Extension activation complete');
 }
 
+/**
+ * Reconnect to the Antigravity language server process and re-initialize monitoring.
+ */
 async function reconnect_extension() {
 	if (is_reconnecting) {
 		logger.debug('Extension', 'Reconnect already in progress, skipping');
@@ -144,6 +152,9 @@ async function reconnect_extension() {
 	}
 }
 
+/**
+ * Detect the running Antigravity process and start quota polling if enabled.
+ */
 async function initialize_extension() {
 	if (is_initialized) {
 		logger.debug('Extension', 'Already initialized, skipping');
@@ -202,6 +213,9 @@ async function initialize_extension() {
 	timer();
 }
 
+/**
+ * Deactivate the extension, stopping background polling and cleaning up UI elements.
+ */
 export function deactivate() {
 	logger.info('Extension', 'Extension deactivating');
 	quota_manager?.stop_polling();
