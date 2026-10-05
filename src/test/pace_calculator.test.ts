@@ -294,9 +294,7 @@ describe('StatusBar - build_tooltip', () => {
 		assert.ok(md_value.includes('Antigravity Quota Details'));
 		assert.ok(md_value.includes('Claude and GPT models (Claude/GPT)'));
 		assert.ok(md_value.includes('- **Weekly**: 80% (Resets in: 4d)'));
-		assert.ok(md_value.includes('  - Pace: 🟢 **Ahead of pace** (+23% buffer)'));
-		assert.ok(md_value.includes('Target Quota: 57.1%'));
-		assert.ok(md_value.includes('+23% buffer'));
+		assert.ok(md_value.includes('  - Estimated Pace: 🟢 **Ahead of pace** (+23% buffer vs linear)'));
 	});
 
 	it('should filter groups in tooltip based on pinned groups', () => {
