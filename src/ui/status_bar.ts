@@ -228,7 +228,7 @@ export class StatusBarManager {
 				has_content = true;
 				for (const m of display_models) {
 					const pct = m.remaining_percentage !== undefined ? `${m.remaining_percentage.toFixed(0)}%` : 'N/A';
-					md.appendMarkdown(`• **${m.label}**: ${pct} (Resets in: ${m.time_until_reset_formatted})\n`);
+					md.appendMarkdown(`- **${m.label}**: ${pct} (Resets in: ${m.time_until_reset_formatted})\n`);
 				}
 				md.appendMarkdown('\n');
 			}
@@ -255,7 +255,7 @@ export class StatusBarManager {
 		const group_header = short_name !== group.display_name
 			? `${group.display_name} (${short_name})`
 			: group.display_name;
-		md.appendMarkdown(`**${group_header}**\n`);
+		md.appendMarkdown(`**${group_header}**\n\n`);
 
 		for (const bucket of sort_buckets(group.buckets)) {
 			const pct = bucket.remaining_percentage !== undefined
@@ -274,15 +274,14 @@ export class StatusBarManager {
 						? 'Behind pace'
 						: 'On track';
 
-					md.appendMarkdown(`• **${window_label}**: ${pct}\n`);
+					md.appendMarkdown(`- **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
 					md.appendMarkdown(`  - Pace: ${pace.emoji} **${status_label}** (${buffer_str} buffer)\n`);
 					md.appendMarkdown(`  - Target Quota: ${pace.target_quota_percentage.toFixed(1)}% (Linear consumption)\n`);
-					md.appendMarkdown(`  - Resets in: ${bucket.time_until_reset_formatted}\n`);
 					continue;
 				}
 			}
 
-			md.appendMarkdown(`• **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
+			md.appendMarkdown(`- **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
 		}
 		md.appendMarkdown('\n');
 	}
