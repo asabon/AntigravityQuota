@@ -28,25 +28,12 @@ export class QuotaManager {
 
 	constructor() {}
 
-	/**
-	 * Initialize the manager with connection port and CSRF authentication token.
-	 *
-	 * @param port Language server connect port
-	 * @param csrf_token Security token for language server requests
-	 */
 	init(port: number, csrf_token: string) {
 		this.port = port;
 		this.csrf_token = csrf_token;
 		this.consecutive_errors = 0;
 	}
 
-	/**
-	 * Perform an HTTPS POST request to the local Antigravity Language Server.
-	 *
-	 * @param path Endpoint route
-	 * @param body JSON request payload
-	 * @returns Parsed JSON response
-	 */
 	private request<T>(path: string, body: object): Promise<T> {
 		return new Promise((resolve, reject) => {
 			const data = JSON.stringify(body);
@@ -88,38 +75,20 @@ export class QuotaManager {
 		});
 	}
 
-	/**
-	 * Register callback invoked on successful quota snapshot updates.
-	 *
-	 * @param callback Callback function receiving the quota snapshot
-	 */
 	on_update(callback: (snapshot: quota_snapshot) => void) {
 		this.update_callback = callback;
 	}
 
-	/**
-	 * Register callback invoked when quota requests fail.
-	 *
-	 * @param callback Callback function receiving error details
-	 */
 	on_error(callback: (error: Error) => void) {
 		this.error_callback = callback;
 	}
 
-	/**
-	 * Start recurring background quota polling.
-	 *
-	 * @param interval_ms Polling interval in milliseconds
-	 */
 	start_polling(interval_ms: number) {
 		this.stop_polling();
 		this.fetch_quota();
 		this.polling_timer = setInterval(() => this.fetch_quota(), interval_ms);
 	}
 
-	/**
-	 * Stop the background polling timer.
-	 */
 	stop_polling() {
 		if (this.polling_timer) {
 			clearInterval(this.polling_timer);
@@ -127,10 +96,6 @@ export class QuotaManager {
 		}
 	}
 
-	/**
-	 * Fetch quota metrics concurrently from GetUserStatus and RetrieveUserQuotaSummary.
-	 * Falls back gracefully to model-only data if RetrieveUserQuotaSummary fails.
-	 */
 	async fetch_quota() {
 		try {
 			const metadata = {
@@ -190,23 +155,10 @@ export class QuotaManager {
 		}
 	}
 
-	/**
-	 * Extract quota info property supporting camelCase and snake_case variations.
-	 *
-	 * @param model Model payload
-	 * @returns Raw quota info if present
-	 */
 	private get_quota_info(model: any): any | undefined {
 		return model.quotaInfo ?? model.quota_info;
 	}
 
-	/**
-	 * Parse quota group limits and buckets (e.g. 5h and weekly) from RetrieveUserQuotaSummary response.
-	 *
-	 * @param data Raw response from RetrieveUserQuotaSummary
-	 * @param now Reference timestamp for reset duration calculation
-	 * @returns List of parsed quota groups or undefined if unavailable
-	 */
 	public parse_quota_groups(
 		data?: server_user_quota_summary_response,
 		now: Date = new Date()
@@ -261,14 +213,6 @@ export class QuotaManager {
 		return groups.length > 0 ? groups : undefined;
 	}
 
-	/**
-	 * Parse combined response from GetUserStatus and optional RetrieveUserQuotaSummary into a unified snapshot.
-	 *
-	 * @param data Response payload from GetUserStatus
-	 * @param quota_summary Optional response payload from RetrieveUserQuotaSummary
-	 * @param now Reference timestamp for calculations
-	 * @returns A consolidated quota snapshot
-	 */
 	public parse_response(
 		data: server_user_status_response,
 		quota_summary?: server_user_quota_summary_response,
@@ -344,13 +288,6 @@ export class QuotaManager {
 		};
 	}
 
-	/**
-	 * Format remaining duration and exact reset timestamp into a user-friendly string.
-	 *
-	 * @param ms Remaining time in milliseconds
-	 * @param reset_time Target reset timestamp
-	 * @returns Human-readable duration string (e.g. "2h 30m (05/10/2026 14:00)")
-	 */
 	public format_time(ms: number, reset_time: Date): string {
 		if (ms <= 0) return 'Ready';
 		const mins = Math.ceil(ms / 60000);
@@ -377,12 +314,6 @@ export class QuotaManager {
 	}
 }
 
-/**
- * Guard against negative remaining time values.
- *
- * @param diff Remaining milliseconds
- * @returns Non-negative difference in milliseconds
- */
 function quota_info_diff(diff: number): number {
 	return diff > 0 ? diff : 0;
 }

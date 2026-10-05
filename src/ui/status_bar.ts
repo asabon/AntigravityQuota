@@ -106,9 +106,6 @@ export class StatusBarManager {
 	private item: vscode.StatusBarItem;
 	private last_snapshot: quota_snapshot | undefined;
 
-	/**
-	 * Create and initialize the status bar item.
-	 */
 	constructor() {
 		this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 		this.item.command = 'agq.show_menu';
@@ -116,19 +113,11 @@ export class StatusBarManager {
 		this.item.show();
 	}
 
-	/**
-	 * Display rotating loading indicator in the status bar.
-	 */
 	show_loading() {
 		this.item.text = '$(sync~spin) AGQ';
 		this.item.show();
 	}
 
-	/**
-	 * Display error badge and set tooltip with failure message.
-	 *
-	 * @param msg Error description
-	 */
 	show_error(msg: string) {
 		this.item.text = '$(error) AGQ';
 		this.item.tooltip = msg;
@@ -136,13 +125,6 @@ export class StatusBarManager {
 		this.item.show();
 	}
 
-	/**
-	 * Update the status bar with the latest quota snapshot and display mode preferences.
-	 *
-	 * @param snapshot Consolidated quota snapshot
-	 * @param show_credits Whether prompt credits should be rendered
-	 * @param mode Active display mode ('models' | 'groups' | 'both')
-	 */
 	update(snapshot: quota_snapshot, show_credits: boolean, mode?: display_mode) {
 		this.last_snapshot = snapshot;
 
@@ -192,21 +174,12 @@ export class StatusBarManager {
 		this.item.show();
 	}
 
-	/**
-	 * Re-render the status bar using the cached snapshot without issuing a new network request.
-	 *
-	 * @param show_credits Whether prompt credits should be rendered
-	 * @param mode Active display mode
-	 */
 	refresh_cached_snapshot(show_credits: boolean, mode?: display_mode) {
 		if (this.last_snapshot) {
 			this.update(this.last_snapshot, show_credits, mode);
 		}
 	}
 
-	/**
-	 * Display the interactive QuickPick menu for pinning and inspecting quotas.
-	 */
 	show_menu() {
 		const pick = vscode.window.createQuickPick();
 		pick.title = 'Antigravity Quota';
@@ -259,28 +232,16 @@ export class StatusBarManager {
 		pick.show();
 	}
 
-	/**
-	 * Get list of pinned model IDs from configuration.
-	 */
 	private get_pinned_models(): string[] {
 		const config = vscode.workspace.getConfiguration('agq');
 		return config.get<string[]>('pinnedModels') || [];
 	}
 
-	/**
-	 * Get list of pinned group names or abbreviations from configuration.
-	 */
 	private get_pinned_groups(): string[] {
 		const config = vscode.workspace.getConfiguration('agq');
 		return config.get<string[]>('pinnedGroups') || [];
 	}
 
-	/**
-	 * Toggle pin status for a quota group using full name, short name, or substring matching.
-	 *
-	 * @param group_key Group short name / identifier
-	 * @param group_display_name Full group display name
-	 */
 	private async toggle_pinned_group(group_key: string, group_display_name?: string): Promise<void> {
 		const config = vscode.workspace.getConfiguration('agq');
 		let pinned = [...(config.get<string[]>('pinnedGroups') || [])];
@@ -308,11 +269,6 @@ export class StatusBarManager {
 		await config.update('pinnedGroups', pinned, vscode.ConfigurationTarget.Global);
 	}
 
-	/**
-	 * Toggle pin status for an individual model ID.
-	 *
-	 * @param model_id Model identifier
-	 */
 	private async toggle_pinned_model(model_id: string): Promise<void> {
 		const config = vscode.workspace.getConfiguration('agq');
 		const pinned = [...(config.get<string[]>('pinnedModels') || [])];
@@ -327,11 +283,6 @@ export class StatusBarManager {
 		await config.update('pinnedModels', pinned, vscode.ConfigurationTarget.Global);
 	}
 
-	/**
-	 * Build QuickPick items structured into shared quota groups and individual model quotas.
-	 *
-	 * @returns Array of QuickPick items ready for presentation
-	 */
 	public build_menu_items(): vscode.QuickPickItem[] {
 		const items: vscode.QuickPickItem[] = [];
 		const snapshot = this.last_snapshot;

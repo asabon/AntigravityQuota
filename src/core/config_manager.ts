@@ -10,9 +10,7 @@ export class ConfigManager {
 	private readonly legacy_config_key = 'agQuota';
 
 	/**
-	 * Get full configuration, falling back to legacy 'agQuota' keys if not explicitly configured in 'agq'.
-	 *
-	 * @returns The resolved configuration options
+	 * Get full config
 	 */
 	get_config(): config_options {
 		const config = vscode.workspace.getConfiguration(this.config_key);
@@ -32,10 +30,7 @@ export class ConfigManager {
 	}
 
 	/**
-	 * Listen to configuration changes on either 'agq' or legacy 'agQuota' namespaces.
-	 *
-	 * @param callback Handler invoked whenever relevant configuration values change
-	 * @returns Disposable listener
+	 * Listen to config changes
 	 */
 	on_config_change(callback: (config: config_options) => void): vscode.Disposable {
 		return vscode.workspace.onDidChangeConfiguration(event => {
