@@ -28,12 +28,25 @@ export class QuotaManager {
 
 	constructor() {}
 
+	/**
+	 * Initialize the manager with connection port and CSRF authentication token.
+	 *
+	 * @param port Language server connect port
+	 * @param csrf_token Security token for language server requests
+	 */
 	init(port: number, csrf_token: string) {
 		this.port = port;
 		this.csrf_token = csrf_token;
 		this.consecutive_errors = 0;
 	}
 
+	/**
+	 * Perform an HTTPS POST request to the local Antigravity Language Server.
+	 *
+	 * @param path Endpoint route
+	 * @param body JSON request payload
+	 * @returns Parsed JSON response
+	 */
 	private request<T>(path: string, body: object): Promise<T> {
 		return new Promise((resolve, reject) => {
 			const data = JSON.stringify(body);
@@ -75,20 +88,38 @@ export class QuotaManager {
 		});
 	}
 
+	/**
+	 * Register callback invoked on successful quota snapshot updates.
+	 *
+	 * @param callback Callback function receiving the quota snapshot
+	 */
 	on_update(callback: (snapshot: quota_snapshot) => void) {
 		this.update_callback = callback;
 	}
 
+	/**
+	 * Register callback invoked when quota requests fail.
+	 *
+	 * @param callback Callback function receiving error details
+	 */
 	on_error(callback: (error: Error) => void) {
 		this.error_callback = callback;
 	}
 
+	/**
+	 * Start recurring background quota polling.
+	 *
+	 * @param interval_ms Polling interval in milliseconds
+	 */
 	start_polling(interval_ms: number) {
 		this.stop_polling();
 		this.fetch_quota();
 		this.polling_timer = setInterval(() => this.fetch_quota(), interval_ms);
 	}
 
+	/**
+	 * Stop the background polling timer.
+	 */
 	stop_polling() {
 		if (this.polling_timer) {
 			clearInterval(this.polling_timer);
@@ -159,6 +190,12 @@ export class QuotaManager {
 		}
 	}
 
+	/**
+	 * Extract quota info property supporting camelCase and snake_case variations.
+	 *
+	 * @param model Model payload
+	 * @returns Raw quota info if present
+	 */
 	private get_quota_info(model: any): any | undefined {
 		return model.quotaInfo ?? model.quota_info;
 	}

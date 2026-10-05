@@ -106,6 +106,9 @@ export class StatusBarManager {
 	private item: vscode.StatusBarItem;
 	private last_snapshot: quota_snapshot | undefined;
 
+	/**
+	 * Create and initialize the status bar item.
+	 */
 	constructor() {
 		this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 		this.item.command = 'agq.show_menu';
@@ -147,11 +150,12 @@ export class StatusBarManager {
 		const current_mode: display_mode = mode ?? config.get<display_mode>('displayMode') ?? 'models';
 		const pinned = this.get_pinned_models();
 		const parts: string[] = [];
+		const has_groups = !!(snapshot.groups && snapshot.groups.length > 0);
 
 		// 1. Group limits
-		if ((current_mode === 'groups' || current_mode === 'both') && snapshot.groups && snapshot.groups.length > 0) {
+		if ((current_mode === 'groups' || current_mode === 'both') && has_groups) {
 			const pinned_groups = this.get_pinned_groups();
-			for (const group of snapshot.groups) {
+			for (const group of snapshot.groups!) {
 				if (is_group_pinned(group.display_name, pinned_groups)) {
 					parts.push(format_group_status(group));
 				}
@@ -159,7 +163,8 @@ export class StatusBarManager {
 		}
 
 		// 2. Individual pinned models
-		if (current_mode === 'models' || current_mode === 'both' || (current_mode === 'groups' && parts.length === 0)) {
+		// Fall back to models in 'groups' mode only if quota group data itself is unavailable or empty.
+		if (current_mode === 'models' || current_mode === 'both' || (current_mode === 'groups' && !has_groups)) {
 			const pinned_models = snapshot.models
 				.filter(m => pinned.includes(m.model_id))
 				.sort((a, b) => a.label.localeCompare(b.label));

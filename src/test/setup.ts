@@ -5,14 +5,29 @@ const originalResolveFilename = Module._resolveFilename;
 
 let configStore: Record<string, any> = {};
 
+/**
+ * Set an in-memory configuration value for unit tests.
+ *
+ * @param key Configuration key (e.g. 'agq.enabled')
+ * @param value Configuration value
+ */
 export function setMockConfig(key: string, value: any) {
 	configStore[key] = value;
 }
 
+/**
+ * Retrieve an in-memory configuration value set during unit tests.
+ *
+ * @param key Configuration key
+ * @returns Stored configuration value
+ */
 export function getMockConfig(key: string) {
 	return configStore[key];
 }
 
+/**
+ * Reset all in-memory configuration values.
+ */
 export function resetMockConfig() {
 	configStore = {};
 }

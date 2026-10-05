@@ -423,6 +423,73 @@ describe('StatusBarManager - build_menu_items', () => {
 		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
 		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['Gemini', 'Claude/GPT']);
 	});
+
+	it('should not fallback to models in groups mode when groups exist but none match pinned filter', () => {
+		resetMockConfig();
+		setMockConfig('agq.pinnedGroups', ['none']);
+		setMockConfig('agq.pinnedModels', ['gemini-3.8-flash-low']);
+
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [
+				{
+					label: 'Gemini 3.8 Flash (Low)',
+					model_id: 'gemini-3.8-flash-low',
+					remaining_percentage: 90,
+					is_exhausted: false,
+					reset_time: new Date(),
+					time_until_reset: 1000,
+					time_until_reset_formatted: '1h',
+				},
+			],
+			groups: [
+				{
+					display_name: 'Gemini Models',
+					buckets: [
+						{
+							bucket_id: 'gemini-5h',
+							display_name: 'Five Hour',
+							window: '5h',
+							remaining_percentage: 90,
+							is_exhausted: false,
+							reset_time: new Date(),
+							time_until_reset: 1000,
+							time_until_reset_formatted: '1h',
+						},
+					],
+				},
+			],
+		};
+
+		sb.update(snapshot, false, 'groups');
+		assert.strictEqual((sb as any).item.text, '$(rocket) AGQ');
+	});
+
+	it('should fallback to models in groups mode when quota groups are unavailable or empty', () => {
+		resetMockConfig();
+		setMockConfig('agq.pinnedModels', ['gemini-3.8-flash-low']);
+
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [
+				{
+					label: 'Gemini 3.8 Flash',
+					model_id: 'gemini-3.8-flash-low',
+					remaining_percentage: 90,
+					is_exhausted: false,
+					reset_time: new Date(),
+					time_until_reset: 1000,
+					time_until_reset_formatted: '1h',
+				},
+			],
+			groups: undefined,
+		};
+
+		sb.update(snapshot, false, 'groups');
+		assert.ok((sb as any).item.text.includes('G3F: 90%'));
+	});
 });
 
 describe('ConfigManager - legacy agQuota fallback', () => {
