@@ -294,7 +294,7 @@ describe('StatusBar - build_tooltip', () => {
 		assert.ok(md_value.includes('Antigravity Quota Details'));
 		assert.ok(md_value.includes('Claude and GPT models (Claude/GPT)'));
 		assert.ok(md_value.includes('Weekly'));
-		assert.ok(md_value.includes('🟢 **Ahead of pace**'));
+		assert.ok(md_value.includes('Pace: 🟢 **Ahead of pace** (+23% buffer)'));
 		assert.ok(md_value.includes('Target Quota: 57.1%'));
 		assert.ok(md_value.includes('+23% buffer'));
 	});

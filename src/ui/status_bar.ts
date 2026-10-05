@@ -222,7 +222,8 @@ export class StatusBarManager {
 								? 'Behind pace'
 								: 'On track';
 
-							md.appendMarkdown(`• **${window_label}**: ${pct} ${pace.emoji} **${status_label}** (${buffer_str} buffer)\n`);
+							md.appendMarkdown(`• **${window_label}**: ${pct}\n`);
+							md.appendMarkdown(`  - Pace: ${pace.emoji} **${status_label}** (${buffer_str} buffer)\n`);
 							md.appendMarkdown(`  - Target Quota: ${pace.target_quota_percentage.toFixed(1)}% (Linear consumption)\n`);
 							md.appendMarkdown(`  - Resets in: ${bucket.time_until_reset_formatted}\n`);
 							continue;
