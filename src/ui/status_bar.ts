@@ -188,63 +188,57 @@ export class StatusBarManager {
 		}
 
 		this.item.backgroundColor = undefined;
-		this.item.tooltip = this.build_tooltip(snapshot, show_pace);
+		this.item.tooltip = this.build_tooltip(snapshot, show_pace, current_mode);
 		this.item.show();
 	}
 
-	public build_tooltip(snapshot: quota_snapshot, show_pace: boolean): vscode.MarkdownString {
+	public build_tooltip(snapshot: quota_snapshot, show_pace: boolean, mode?: display_mode): vscode.MarkdownString {
 		const md = new vscode.MarkdownString();
 		md.supportThemeIcons = true;
 		md.appendMarkdown('### $(rocket) Antigravity Quota Details\n\n');
 
-		if (snapshot.groups && snapshot.groups.length > 0) {
-			for (const group of snapshot.groups) {
-				const short_name = get_group_short_name(group.display_name);
-				const group_header = short_name !== group.display_name
-					? `${group.display_name} (${short_name})`
-					: group.display_name;
-				md.appendMarkdown(`**${group_header}**\n`);
+		const config = vscode.workspace.getConfiguration('agq');
+		const current_mode: display_mode = mode ?? config.get<display_mode>('displayMode') ?? 'groups';
+		const pinned_groups = this.get_pinned_groups();
+		const pinned_models = this.get_pinned_models();
 
-				for (const bucket of sort_buckets(group.buckets)) {
-					const pct = bucket.remaining_percentage !== undefined
-						? `${bucket.remaining_percentage.toFixed(0)}%`
-						: 'N/A';
-					const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
+		const show_groups = (current_mode === 'groups' || current_mode === 'both') && !!(snapshot.groups && snapshot.groups.length > 0);
+		const show_models = current_mode === 'models' || current_mode === 'both';
 
-					if (bucket.window === 'weekly' && show_pace) {
-						const pace = calculate_weekly_pace(bucket.remaining_fraction, bucket.time_until_reset);
-						if (pace) {
-							const buffer_sign = pace.buffer_percentage >= 0 ? '+' : '';
-							const buffer_str = `${buffer_sign}${pace.buffer_percentage.toFixed(0)}%`;
-							const status_label = pace.status === 'ahead'
-								? 'Ahead of pace'
-								: pace.status === 'behind'
-								? 'Behind pace'
-								: 'On track';
+		let has_content = false;
 
-							md.appendMarkdown(`• **${window_label}**: ${pct}\n`);
-							md.appendMarkdown(`  - Pace: ${pace.emoji} **${status_label}** (${buffer_str} buffer)\n`);
-							md.appendMarkdown(`  - Target Quota: ${pace.target_quota_percentage.toFixed(1)}% (Linear consumption)\n`);
-							md.appendMarkdown(`  - Resets in: ${bucket.time_until_reset_formatted}\n`);
-							continue;
-						}
-					}
+		// 1. Group limits
+		if (show_groups && snapshot.groups) {
+			const filtered_groups = snapshot.groups.filter(g => is_group_pinned(g.display_name, pinned_groups));
+			const groups_to_show = filtered_groups.length > 0 ? filtered_groups : (current_mode === 'both' ? [] : snapshot.groups);
 
-					md.appendMarkdown(`• **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
+			for (const group of groups_to_show) {
+				has_content = true;
+				this.render_group_markdown(md, group, show_pace);
+			}
+		}
+
+		// 2. Individual models
+		if ((show_models || !has_content) && snapshot.models && snapshot.models.length > 0) {
+			const display_models = pinned_models.length > 0
+				? snapshot.models.filter(m => pinned_models.includes(m.model_id))
+				: (has_content ? [] : snapshot.models.slice(0, 5));
+
+			if (display_models.length > 0) {
+				has_content = true;
+				for (const m of display_models) {
+					const pct = m.remaining_percentage !== undefined ? `${m.remaining_percentage.toFixed(0)}%` : 'N/A';
+					md.appendMarkdown(`• **${m.label}**: ${pct} (Resets in: ${m.time_until_reset_formatted})\n`);
 				}
 				md.appendMarkdown('\n');
 			}
-		} else if (snapshot.models && snapshot.models.length > 0) {
-			const pinned = this.get_pinned_models();
-			const display_models = pinned.length > 0
-				? snapshot.models.filter(m => pinned.includes(m.model_id))
-				: snapshot.models.slice(0, 5);
+		}
 
-			for (const m of display_models) {
-				const pct = m.remaining_percentage !== undefined ? `${m.remaining_percentage.toFixed(0)}%` : 'N/A';
-				md.appendMarkdown(`• **${m.label}**: ${pct} (Resets in: ${m.time_until_reset_formatted})\n`);
+		// Fallback: If nothing was displayed and snapshot has groups, display all groups
+		if (!has_content && snapshot.groups && snapshot.groups.length > 0) {
+			for (const group of snapshot.groups) {
+				this.render_group_markdown(md, group, show_pace);
 			}
-			md.appendMarkdown('\n');
 		}
 
 		if (snapshot.prompt_credits) {
@@ -254,6 +248,43 @@ export class StatusBarManager {
 
 		md.appendMarkdown('---\n*Click to open quota menu*');
 		return md;
+	}
+
+	private render_group_markdown(md: vscode.MarkdownString, group: quota_group_info, show_pace: boolean): void {
+		const short_name = get_group_short_name(group.display_name);
+		const group_header = short_name !== group.display_name
+			? `${group.display_name} (${short_name})`
+			: group.display_name;
+		md.appendMarkdown(`**${group_header}**\n`);
+
+		for (const bucket of sort_buckets(group.buckets)) {
+			const pct = bucket.remaining_percentage !== undefined
+				? `${bucket.remaining_percentage.toFixed(0)}%`
+				: 'N/A';
+			const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
+
+			if (bucket.window === 'weekly' && show_pace) {
+				const pace = calculate_weekly_pace(bucket.remaining_fraction, bucket.time_until_reset);
+				if (pace) {
+					const buffer_sign = pace.buffer_percentage >= 0 ? '+' : '';
+					const buffer_str = `${buffer_sign}${pace.buffer_percentage.toFixed(0)}%`;
+					const status_label = pace.status === 'ahead'
+						? 'Ahead of pace'
+						: pace.status === 'behind'
+						? 'Behind pace'
+						: 'On track';
+
+					md.appendMarkdown(`• **${window_label}**: ${pct}\n`);
+					md.appendMarkdown(`  - Pace: ${pace.emoji} **${status_label}** (${buffer_str} buffer)\n`);
+					md.appendMarkdown(`  - Target Quota: ${pace.target_quota_percentage.toFixed(1)}% (Linear consumption)\n`);
+					md.appendMarkdown(`  - Resets in: ${bucket.time_until_reset_formatted}\n`);
+					continue;
+				}
+			}
+
+			md.appendMarkdown(`• **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
+		}
+		md.appendMarkdown('\n');
 	}
 
 	show_menu() {

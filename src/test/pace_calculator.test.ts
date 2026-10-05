@@ -298,4 +298,41 @@ describe('StatusBar - build_tooltip', () => {
 		assert.ok(md_value.includes('Target Quota: 57.1%'));
 		assert.ok(md_value.includes('+23% buffer'));
 	});
+
+	it('should filter groups in tooltip based on pinned groups', () => {
+		const multi_group_snapshot: quota_snapshot = {
+			...mock_snapshot,
+			groups: [
+				mock_snapshot.groups![0],
+				{
+					display_name: 'Gemini Models',
+					buckets: [
+						{
+							bucket_id: '5h',
+							display_name: 'Five Hour',
+							window: '5h',
+							remaining_fraction: 0.9,
+							remaining_percentage: 90,
+							is_exhausted: false,
+							reset_time: new Date(),
+							time_until_reset: 3 * 60 * 60 * 1000,
+							time_until_reset_formatted: '3h',
+						},
+					],
+				},
+			],
+		};
+
+		const original_get_pinned_groups = (status_bar as any).get_pinned_groups;
+		try {
+			(status_bar as any).get_pinned_groups = () => ['Gemini'];
+			const tooltip = status_bar.build_tooltip(multi_group_snapshot, true, 'groups');
+			const md_value = tooltip.value;
+
+			assert.ok(md_value.includes('Gemini Models'));
+			assert.ok(!md_value.includes('Claude and GPT models'));
+		} finally {
+			(status_bar as any).get_pinned_groups = original_get_pinned_groups;
+		}
+	});
 });
