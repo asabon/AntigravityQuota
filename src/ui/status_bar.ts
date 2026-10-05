@@ -3,7 +3,8 @@
  */
 
 import * as vscode from 'vscode';
-import {quota_snapshot, model_quota_info, quota_group_info, display_mode} from '../utils/types';
+import {quota_snapshot, model_quota_info, quota_group_info, quota_bucket_info, display_mode} from '../utils/types';
+import {calculate_weekly_pace} from '../core/pace_calculator';
 
 /** Mapping of model labels to short abbreviations for status bar display */
 const MODEL_ABBREVIATIONS: Record<string, string> = {
@@ -53,15 +54,24 @@ export function get_group_short_name(group_name: string): string {
 	return group_name.split(/\s+/)[0] || group_name;
 }
 
+/** Sort quota buckets so shorter windows appear first (e.g. 5h before weekly) */
+export function sort_buckets(buckets: quota_bucket_info[]): quota_bucket_info[] {
+	return [...buckets].sort((a, b) => {
+		const order_a = a.window === '5h' ? 1 : a.window === 'weekly' ? 2 : 99;
+		const order_b = b.window === '5h' ? 1 : b.window === 'weekly' ? 2 : 99;
+		return order_a - order_b;
+	});
+}
+
 /** Format a single quota group into status bar string */
-export function format_group_status(group: quota_group_info): string {
+export function format_group_status(group: quota_group_info, show_pace_indicator: boolean = true): string {
 	const short_name = get_group_short_name(group.display_name);
 	const bucket_parts: string[] = [];
 
 	let min_pct: number | undefined;
 	let has_exhausted = false;
 
-	for (const b of group.buckets) {
+	for (const b of sort_buckets(group.buckets)) {
 		const pct = b.remaining_percentage;
 		if (b.is_exhausted) has_exhausted = true;
 		if (pct !== undefined) {
@@ -72,7 +82,16 @@ export function format_group_status(group: quota_group_info): string {
 
 		const pct_str = pct !== undefined ? `${pct.toFixed(0)}%` : 'N/A';
 		const window_label = b.window === 'weekly' ? '1w' : b.window;
-		bucket_parts.push(`${window_label}: ${pct_str}`);
+
+		let badge = '';
+		if (b.window === 'weekly' && show_pace_indicator) {
+			const pace = calculate_weekly_pace(b.remaining_fraction, b.time_until_reset);
+			if (pace) {
+				badge = pace.emoji;
+			}
+		}
+
+		bucket_parts.push(`${window_label}: ${pct_str}${badge}`);
 	}
 
 	const icon = has_exhausted ? '$(error)' : min_pct !== undefined && min_pct < 20 ? '$(warning)' : '$(check)';
@@ -130,6 +149,7 @@ export class StatusBarManager {
 
 		const config = vscode.workspace.getConfiguration('agq');
 		const current_mode: display_mode = mode ?? config.get<display_mode>('displayMode') ?? 'models';
+		const show_pace = config.get<boolean>('showWeeklyPaceIndicator', true);
 		const pinned = this.get_pinned_models();
 		const parts: string[] = [];
 
@@ -138,7 +158,7 @@ export class StatusBarManager {
 			const pinned_groups = this.get_pinned_groups();
 			for (const group of snapshot.groups) {
 				if (is_group_pinned(group.display_name, pinned_groups)) {
-					parts.push(format_group_status(group));
+					parts.push(format_group_status(group, show_pace));
 				}
 			}
 		}
@@ -168,8 +188,101 @@ export class StatusBarManager {
 		}
 
 		this.item.backgroundColor = undefined;
-		this.item.tooltip = 'Click to view Antigravity Quota details';
+		this.item.tooltip = this.build_tooltip(snapshot, show_pace, current_mode);
 		this.item.show();
+	}
+
+	public build_tooltip(snapshot: quota_snapshot, show_pace: boolean, mode?: display_mode): vscode.MarkdownString {
+		const md = new vscode.MarkdownString();
+		md.supportThemeIcons = true;
+		md.appendMarkdown('### $(rocket) Antigravity Quota Details\n\n');
+
+		const config = vscode.workspace.getConfiguration('agq');
+		const current_mode: display_mode = mode ?? config.get<display_mode>('displayMode') ?? 'groups';
+		const pinned_groups = this.get_pinned_groups();
+		const pinned_models = this.get_pinned_models();
+
+		const show_groups = (current_mode === 'groups' || current_mode === 'both') && !!(snapshot.groups && snapshot.groups.length > 0);
+		const show_models = current_mode === 'models' || current_mode === 'both';
+
+		let has_content = false;
+
+		// 1. Group limits
+		if (show_groups && snapshot.groups) {
+			const filtered_groups = snapshot.groups.filter(g => is_group_pinned(g.display_name, pinned_groups));
+			const groups_to_show = filtered_groups.length > 0 ? filtered_groups : (current_mode === 'both' ? [] : snapshot.groups);
+
+			for (const group of groups_to_show) {
+				has_content = true;
+				this.render_group_markdown(md, group, show_pace);
+			}
+		}
+
+		// 2. Individual models
+		if ((show_models || !has_content) && snapshot.models && snapshot.models.length > 0) {
+			const display_models = pinned_models.length > 0
+				? snapshot.models.filter(m => pinned_models.includes(m.model_id))
+				: (has_content ? [] : snapshot.models.slice(0, 5));
+
+			if (display_models.length > 0) {
+				has_content = true;
+				for (const m of display_models) {
+					const pct = m.remaining_percentage !== undefined ? `${m.remaining_percentage.toFixed(0)}%` : 'N/A';
+					md.appendMarkdown(`- **${m.label}**: ${pct} (Resets in: ${m.time_until_reset_formatted})\n`);
+				}
+				md.appendMarkdown('\n');
+			}
+		}
+
+		// Fallback: If nothing was displayed and snapshot has groups, display all groups
+		if (!has_content && snapshot.groups && snapshot.groups.length > 0) {
+			for (const group of snapshot.groups) {
+				this.render_group_markdown(md, group, show_pace);
+			}
+		}
+
+		if (snapshot.prompt_credits) {
+			const credits = snapshot.prompt_credits;
+			md.appendMarkdown(`**Prompt Credits**: ${credits.available} / ${credits.monthly} (${credits.remaining_percentage.toFixed(0)}% remaining)\n\n`);
+		}
+
+		md.appendMarkdown('---\n*Click to open quota menu*');
+		return md;
+	}
+
+	private render_group_markdown(md: vscode.MarkdownString, group: quota_group_info, show_pace: boolean): void {
+		const short_name = get_group_short_name(group.display_name);
+		const group_header = short_name !== group.display_name
+			? `${group.display_name} (${short_name})`
+			: group.display_name;
+		md.appendMarkdown(`**${group_header}**\n\n`);
+
+		for (const bucket of sort_buckets(group.buckets)) {
+			const pct = bucket.remaining_percentage !== undefined
+				? `${bucket.remaining_percentage.toFixed(0)}%`
+				: 'N/A';
+			const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
+
+			if (bucket.window === 'weekly' && show_pace) {
+				const pace = calculate_weekly_pace(bucket.remaining_fraction, bucket.time_until_reset);
+				if (pace) {
+					const buffer_sign = pace.buffer_percentage >= 0 ? '+' : '';
+					const buffer_str = `${buffer_sign}${pace.buffer_percentage.toFixed(0)}%`;
+					const status_label = pace.status === 'ahead'
+						? 'Ahead of pace'
+						: pace.status === 'behind'
+						? 'Behind pace'
+						: 'On track';
+
+					md.appendMarkdown(`- **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
+					md.appendMarkdown(`  - Estimated Pace: ${pace.emoji} **${status_label}** (${buffer_str} buffer vs linear)\n`);
+					continue;
+				}
+			}
+
+			md.appendMarkdown(`- **${window_label}**: ${pct} (Resets in: ${bucket.time_until_reset_formatted})\n`);
+		}
+		md.appendMarkdown('\n');
 	}
 
 	show_menu() {
@@ -276,6 +389,9 @@ export class StatusBarManager {
 		const snapshot = this.last_snapshot;
 		const pinned = this.get_pinned_models();
 
+		const config = vscode.workspace.getConfiguration('agq');
+		const show_pace = config.get<boolean>('showWeeklyPaceIndicator', true);
+
 		// Section: Shared Quota Groups
 		if (snapshot?.groups && snapshot.groups.length > 0) {
 			items.push({label: 'Quota Groups (Toggle Pin)', kind: vscode.QuickPickItemKind.Separator});
@@ -312,14 +428,28 @@ export class StatusBarManager {
 				items.push(parent_item);
 
 				// Child Bucket Items (Indented, vertical progress bars)
-				for (const bucket of group.buckets) {
+				for (const bucket of sort_buckets(group.buckets)) {
 					const pct = bucket.remaining_percentage;
 					const pct_display = pct !== undefined ? `${pct.toFixed(1)}%` : 'N/A';
 					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);
 					const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
 
+					let pace_badge = '';
+					if (bucket.window === 'weekly' && show_pace) {
+						const pace = calculate_weekly_pace(bucket.remaining_fraction, bucket.time_until_reset);
+						if (pace) {
+							const buffer_sign = pace.buffer_percentage >= 0 ? '+' : '';
+							const status_label = pace.status === 'ahead'
+								? 'Ahead'
+								: pace.status === 'behind'
+								? 'Behind'
+								: 'On Track';
+							pace_badge = ` ${pace.emoji} ${status_label} (${buffer_sign}${pace.buffer_percentage.toFixed(0)}%)`;
+						}
+					}
+
 					const child_item: vscode.QuickPickItem & {group_name?: string} = {
-						label: `      ${window_label}: ${bar} ${pct_display}`,
+						label: `      ${window_label}: ${bar} ${pct_display}${pace_badge}`,
 						description: `Resets in: ${bucket.time_until_reset_formatted}`,
 					};
 					child_item.group_name = short_name;
