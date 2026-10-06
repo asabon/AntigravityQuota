@@ -174,6 +174,11 @@ export class StatusBarManager {
 		this.item.show();
 	}
 
+	/**
+	 * Re-render status bar using the cached quota snapshot
+	 * @param show_credits Whether to show prompt credits
+	 * @param mode Display mode (models, groups, or both)
+	 */
 	refresh_cached_snapshot(show_credits: boolean, mode?: display_mode) {
 		if (this.last_snapshot) {
 			this.update(this.last_snapshot, show_credits, mode);
@@ -237,11 +242,20 @@ export class StatusBarManager {
 		return config.get<string[]>('pinnedModels') || [];
 	}
 
+	/**
+	 * Get list of pinned quota group identifiers from configuration
+	 * @returns Array of pinned group names or keys
+	 */
 	private get_pinned_groups(): string[] {
 		const config = vscode.workspace.getConfiguration('agq');
 		return config.get<string[]>('pinnedGroups') || [];
 	}
 
+	/**
+	 * Toggle pin status for a quota group in global configuration
+	 * @param group_key Short key or identifier of the group
+	 * @param group_display_name Full display name of the group
+	 */
 	private async toggle_pinned_group(group_key: string, group_display_name?: string): Promise<void> {
 		const config = vscode.workspace.getConfiguration('agq');
 		let pinned = [...(config.get<string[]>('pinnedGroups') || [])];

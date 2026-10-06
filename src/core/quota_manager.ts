@@ -159,6 +159,12 @@ export class QuotaManager {
 		return model.quotaInfo ?? model.quota_info;
 	}
 
+	/**
+	 * Parse quota groups from the RetrieveUserQuotaSummary API response
+	 * @param data Response from RetrieveUserQuotaSummary
+	 * @param now Current timestamp for time calculations
+	 * @returns Array of quota group info or undefined
+	 */
 	public parse_quota_groups(
 		data?: server_user_quota_summary_response,
 		now: Date = new Date()
@@ -314,6 +320,11 @@ export class QuotaManager {
 	}
 }
 
+/**
+ * Ensure time difference is non-negative
+ * @param diff Time difference in milliseconds
+ * @returns Non-negative difference in milliseconds
+ */
 function quota_info_diff(diff: number): number {
 	return diff > 0 ? diff : 0;
 }

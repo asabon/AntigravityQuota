@@ -523,4 +523,18 @@ describe('ConfigManager - legacy agQuota fallback', () => {
 		assert.strictEqual(config.show_prompt_credits, true);
 		assert.strictEqual(config.display_mode, 'models');
 	});
+
+	it('should prioritize explicit agq over legacy agQuota', () => {
+		resetMockConfig();
+		setMockConfig('agQuota.enabled', false);
+		setMockConfig('agq.enabled', true);
+		setMockConfig('agQuota.pollingInterval', 90);
+		setMockConfig('agq.pollingInterval', 45);
+
+		const cm = new ConfigManager();
+		const config = cm.get_config();
+
+		assert.strictEqual(config.enabled, true);
+		assert.strictEqual(config.polling_interval, 45000);
+	});
 });

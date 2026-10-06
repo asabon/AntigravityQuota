@@ -55,6 +55,22 @@ const mockVscode = {
 				if (key in configStore) return configStore[key];
 				return defaultValue;
 			},
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			inspect: (key: string) => {
+				const fullKey = section ? `${section}.${key}` : key;
+				const hasVal = fullKey in configStore || key in configStore;
+				if (hasVal) {
+					const val = fullKey in configStore ? configStore[fullKey] : configStore[key];
+					return {
+						key,
+						defaultValue: undefined,
+						globalValue: val,
+						workspaceValue: undefined,
+						workspaceFolderValue: undefined,
+					};
+				}
+				return undefined;
+			},
 			update: async (key: string, value: any) => {
 				const fullKey = section ? `${section}.${key}` : key;
 				configStore[fullKey] = value;
