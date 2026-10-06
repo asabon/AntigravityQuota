@@ -202,8 +202,8 @@ export class QuotaManager {
 					remaining_percentage,
 					is_exhausted: remaining_fraction === 0,
 					reset_time,
-					time_until_reset: quota_info_diff(diff),
-					time_until_reset_formatted: this.format_time(diff, reset_time),
+					time_until_reset: reset_time_raw ? quota_info_diff(diff) : 0,
+					time_until_reset_formatted: reset_time_raw ? this.format_time(diff, reset_time) : 'Unknown',
 				});
 			}
 

@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import {quota_snapshot, model_quota_info, quota_group_info, display_mode} from '../utils/types';
+import {ConfigManager} from '../core/config_manager';
 
 /** Mapping of model labels to short abbreviations for status bar display */
 const MODEL_ABBREVIATIONS: Record<string, string> = {
@@ -80,6 +81,15 @@ export function format_group_status(group: quota_group_info): string {
 }
 
 /**
+ * Escape regular expression special characters
+ * @param str Input string
+ * @returns Escaped regex string
+ */
+function escape_regex(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Check if a quota group is pinned for status bar display
  */
 export function is_group_pinned(group_name: string, pinned_groups: string[]): boolean {
@@ -90,7 +100,12 @@ export function is_group_pinned(group_name: string, pinned_groups: string[]): bo
 	const full_name = group_name.toLowerCase();
 	return pinned_groups.some(p => {
 		const target = p.toLowerCase();
-		return target === short_name || target === full_name || full_name.includes(target);
+		if (target === short_name || target === full_name) {
+			return true;
+		}
+		// Word-boundary matching (e.g. 'GPT' or 'Claude' matches 'Claude and GPT models' or 'Claude/GPT')
+		const regex = new RegExp(`(^|[\\s/\\-_,.])${escape_regex(target)}($|[\\s/\\-_,.])`, 'i');
+		return regex.test(full_name) || regex.test(short_name);
 	});
 }
 
@@ -105,6 +120,7 @@ export function draw_progress_bar(percentage: number): string {
 export class StatusBarManager {
 	private item: vscode.StatusBarItem;
 	private last_snapshot: quota_snapshot | undefined;
+	private config_manager = new ConfigManager();
 
 	constructor() {
 		this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -128,8 +144,8 @@ export class StatusBarManager {
 	update(snapshot: quota_snapshot, show_credits: boolean, mode?: display_mode) {
 		this.last_snapshot = snapshot;
 
-		const config = vscode.workspace.getConfiguration('agq');
-		const current_mode: display_mode = mode ?? config.get<display_mode>('displayMode') ?? 'models';
+		const resolved_config = this.config_manager.get_config();
+		const current_mode: display_mode = mode ?? resolved_config.display_mode ?? 'models';
 		const pinned = this.get_pinned_models();
 		const parts: string[] = [];
 		const has_groups = !!(snapshot.groups && snapshot.groups.length > 0);
@@ -209,22 +225,22 @@ export class StatusBarManager {
 				);
 				pick.items = this.build_menu_items();
 				if (this.last_snapshot) {
-					const config = vscode.workspace.getConfiguration('agq');
+					const cfg = this.config_manager.get_config();
 					this.update(
 						this.last_snapshot,
-						!!config.get('showPromptCredits'),
-						config.get<display_mode>('displayMode')
+						cfg.show_prompt_credits ?? false,
+						cfg.display_mode
 					);
 				}
 			} else if (currentActiveItem && 'model_id' in currentActiveItem) {
 				await this.toggle_pinned_model((currentActiveItem as any).model_id);
 				pick.items = this.build_menu_items();
 				if (this.last_snapshot) {
-					const config = vscode.workspace.getConfiguration('agq');
+					const cfg = this.config_manager.get_config();
 					this.update(
 						this.last_snapshot,
-						!!config.get('showPromptCredits'),
-						config.get<display_mode>('displayMode')
+						cfg.show_prompt_credits ?? false,
+						cfg.display_mode
 					);
 				}
 			}

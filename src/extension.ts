@@ -116,11 +116,11 @@ export async function activate(context: vscode.ExtensionContext) {
 				quota_manager.start_polling(new_config.polling_interval);
 			} else if (!new_config.enabled) {
 				quota_manager.stop_polling();
-				status_bar.refresh_cached_snapshot(
-					new_config.show_prompt_credits ?? false,
-					new_config.display_mode
-				);
 			}
+			status_bar.refresh_cached_snapshot(
+				new_config.show_prompt_credits ?? false,
+				new_config.display_mode
+			);
 		})
 	);
 

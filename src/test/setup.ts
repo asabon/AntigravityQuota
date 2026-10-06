@@ -51,30 +51,23 @@ const mockVscode = {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			get: (key: string, defaultValue: any) => {
 				const fullKey = section ? `${section}.${key}` : key;
-				if (fullKey in configStore) return configStore[fullKey];
-				if (key in configStore) return configStore[key];
-				return defaultValue;
+				return fullKey in configStore ? configStore[fullKey] : defaultValue;
 			},
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			inspect: (key: string) => {
 				const fullKey = section ? `${section}.${key}` : key;
-				const hasVal = fullKey in configStore || key in configStore;
-				if (hasVal) {
-					const val = fullKey in configStore ? configStore[fullKey] : configStore[key];
-					return {
-						key,
-						defaultValue: undefined,
-						globalValue: val,
-						workspaceValue: undefined,
-						workspaceFolderValue: undefined,
-					};
-				}
-				return undefined;
+				const hasVal = fullKey in configStore;
+				return {
+					key,
+					defaultValue: undefined,
+					globalValue: hasVal ? configStore[fullKey] : undefined,
+					workspaceValue: undefined,
+					workspaceFolderValue: undefined,
+				};
 			},
 			update: async (key: string, value: any) => {
 				const fullKey = section ? `${section}.${key}` : key;
 				configStore[fullKey] = value;
-				configStore[key] = value;
 			},
 		}),
 		onDidChangeConfiguration: () => ({ dispose: () => {} }),
