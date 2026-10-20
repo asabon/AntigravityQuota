@@ -131,7 +131,7 @@ git branch -d feature/<topic-name>
 > 本家（`upstream`）に PR を作成する前に、**必ず Fork 側（`asabon/AntigravityQuota`）の PR 上で CodeRabbit による自動レビューを受け、すべての指摘事項を解消して `develop` に Squash & Merge 済みであること**。
 >
 > - **目的**: 本家の PR タイムライン上で bot の往復通知が大量発生し、オーナーの通知を圧迫（Notification Spam）する事態を恒久的に防ぐため。
-> - 本家に出す時点では、CodeRabbit の指摘対応も含んだ「完全にクリーンな 1 コミット」のみを cherry-pick して提出すること。これにより、本家側の CodeRabbit も初手から一発で指摘ゼロ（Pass）となり、オーナーへの通知負担を最小限に抑えられます。
+> - 本家に出す時点では、CodeRabbit の指摘対応も含んだ「完全にクリーンな 1 コミット」のみを cherry-pick して提出すること。これにより、本家側で Fork 側と重複する指摘が出る可能性を下げ、オーナーへの通知負担を最小限に抑えられます。本家側で新しい指摘が出た場合は、その内容を確認して対応すること。
 
 `develop` に Squash & Merge されたクリーンな 1 コミットのみを cherry-pick します：
 
