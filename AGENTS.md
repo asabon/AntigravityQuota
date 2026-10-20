@@ -110,8 +110,13 @@ git push -u origin feature/<topic-name>
 gh pr create --repo asabon/AntigravityQuota --base develop --head feature/<topic-name> --body-file scratch/pr_body.md
 # ※ PR 作成後、ユーザーに PR の URL を報告して停止する（AI による自動マージは禁止）。
 
+# 3.5. CodeRabbit 自動レビュー指摘の解消（最重要品質ゲート）
+# Fork 側 PR 上で CodeRabbit（ASSERTIVE モード）が実行されます。
+# 指摘（Comments / Actionable items）が出た場合は、すべて Fork ブランチ上で修正コミットを行い、
+# CodeRabbit の指摘がゼロ（LGTM / All checks green）になるまで対応を完了させます。
+
 # --- [ユーザーの作業範囲] ---
-# 4. ユーザーが GitHub 上で差分・CI を確認し、Squash & Merge を実行
+# 4. ユーザーが GitHub 上で差分・CI・CodeRabbit の結果を確認し、Squash & Merge を実行
 # （CLI で行う場合: gh pr merge <PR番号> --repo asabon/AntigravityQuota --squash --delete-branch）
 
 # 5. マージ完了後、ローカルの develop を最新化し、作業ブランチを削除
@@ -121,6 +126,13 @@ git branch -d feature/<topic-name>
 ```
 
 ### 4. 本家（upstream）への PR 作成手順
+
+> 🚨 **【事前必須条件】本家 PR 作成前の CodeRabbit 指摘ゼロ化の義務**:
+> 本家（`upstream`）に PR を作成する前に、**必ず Fork 側（`asabon/AntigravityQuota`）の PR 上で CodeRabbit による自動レビューを受け、すべての指摘事項を解消して `develop` に Squash & Merge 済みであること**。
+>
+> - **目的**: 本家の PR タイムライン上で bot の往復通知が大量発生し、オーナーの通知を圧迫（Notification Spam）する事態を恒久的に防ぐため。
+> - 本家に出す時点では、CodeRabbit の指摘対応も含んだ「完全にクリーンな 1 コミット」のみを cherry-pick して提出すること。これにより、本家側で Fork 側と重複する指摘が出る可能性を下げ、オーナーへの通知負担を最小限に抑えられます。本家側で新しい指摘が出た場合は、その内容を確認して対応すること。
+
 `develop` に Squash & Merge されたクリーンな 1 コミットのみを cherry-pick します：
 
 ```powershell
