@@ -1,9 +1,9 @@
 # Proposal 001: モデルグループ別クォータ（5h / 1w リミット）の取得と表示
 
 - **作成日**: 2026-10-03
-- **ステータス**: Implemented (Merged to develop via PR #5)
+- **ステータス**: Merged into Upstream (v1.2.0)
 - **対象コンポーネント**: `src/utils/types.ts`, `src/core/quota_manager.ts`, `src/ui/status_bar.ts`, `src/core/config_manager.ts`, `package.json`, `src/test/`
-- **関連 Issue / PR**: [PR #5 (develop)](https://github.com/asabon/AntigravityQuota/pull/5), [PR #6 (develop)](https://github.com/asabon/AntigravityQuota/pull/6), 本家提出予定
+- **関連 Issue / PR**: [PR #5 (develop)](https://github.com/asabon/AntigravityQuota/pull/5), [PR #6 (develop)](https://github.com/asabon/AntigravityQuota/pull/6), [Upstream PR #29](https://github.com/Henrik-3/AntigravityQuota/pull/29), [Release v1.2.0](https://github.com/Henrik-3/AntigravityQuota/releases/tag/v1.2.0)
 
 ---
 
@@ -386,3 +386,16 @@ Exposing the underlying shared quota groups directly solves this redundancy and 
 > #### スクリーンショット
 > - ステータスバー表示 (`agq.displayMode: "groups"`): [画像](https://github.com/user-attachments/assets/f093695b-fcc3-4961-873e-f9a24dfb9d47)
 > - インタラクティブメニュー: [画像](https://github.com/user-attachments/assets/22219a4f-9092-4ab0-9371-d3a221c7e210)
+
+---
+
+## 8. 本家マージ・リリース実績 (Upstream Merge & Release)
+
+- **本家 PR**: [Henrik-3/AntigravityQuota#29](https://github.com/Henrik-3/AntigravityQuota/pull/29)
+  - **マージ日時**: 2026-10-26
+  - **レビュアー / マージ担当**: @Henrik-3
+- **本家リリース**: [v1.2.0](https://github.com/Henrik-3/AntigravityQuota/releases/tag/v1.2.0)
+  - **リリース日**: 2026-10-26
+  - **主な内容**: `feat: support weekly and 5-hour quota groups via RetrieveUserQuotaSummary (closes #28) by @asabon`
+  - **配布パッケージ**: `ag-quota-1.2.0.vsix`
+
