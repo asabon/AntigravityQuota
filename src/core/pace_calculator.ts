@@ -12,9 +12,6 @@ export const WEEKLY_CYCLE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Buffer percentage threshold below which pace is critically behind (-10%) */
 export const PACE_CRITICAL_THRESHOLD = -10.0;
 
-/** Backward-compatible alias for buffer threshold */
-export const PACE_BUFFER_THRESHOLD = 10.0;
-
 /**
  * Calculate weekly quota pace info comparing remaining quota fraction to linear target.
  *
