@@ -71,11 +71,21 @@ export type api_method_preference = 'COMMAND_MODEL_CONFIG' | 'GET_USER_STATUS';
 
 export type display_mode = 'models' | 'groups' | 'both';
 
+export type pace_status = 'ahead' | 'on_track' | 'behind';
+
+export interface weekly_pace_info {
+	status: pace_status;
+	emoji: string;
+	buffer_percentage: number;
+	target_quota_percentage: number;
+}
+
 export interface config_options {
 	enabled: boolean;
 	polling_interval: number;
 	show_prompt_credits?: boolean;
 	display_mode?: display_mode;
+	show_weekly_pace_indicator?: boolean;
 }
 
 // Server Response Types (Must match external API, usually camelCase or snake_case depending on proto to JSON mapping)
