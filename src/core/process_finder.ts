@@ -21,23 +21,32 @@ const LOG_CAT = 'ProcessFinder';
 
 export class ProcessFinder {
 	private strategy: platform_strategy;
-	private process_name: string;
+	private process_names: string[];
 
 	constructor() {
 		logger.debug(LOG_CAT, `Initializing ProcessFinder for platform: ${process.platform}, arch: ${process.arch}`);
 
 		if (process.platform === 'win32') {
 			this.strategy = new WindowsStrategy();
-			this.process_name = `language_server_windows_${process.arch === 'arm64' ? 'arm' : 'x64'}.exe`;
+			this.process_names = [
+				'agy.exe',
+				`language_server_windows_${process.arch === 'arm64' ? 'arm' : 'x64'}.exe`,
+			];
 		} else if (process.platform === 'darwin') {
 			this.strategy = new UnixStrategy('darwin');
-			this.process_name = `language_server_macos${process.arch === 'arm64' ? '_arm' : ''}`;
+			this.process_names = [
+				'agy',
+				`language_server_macos${process.arch === 'arm64' ? '_arm' : ''}`,
+			];
 		} else {
 			this.strategy = new UnixStrategy('linux');
-			this.process_name = `language_server_linux${process.arch === 'arm64' ? '_arm' : '_x64'}`;
+			this.process_names = [
+				'agy',
+				`language_server_linux${process.arch === 'arm64' ? '_arm' : '_x64'}`,
+			];
 		}
 
-		logger.info(LOG_CAT, `Target process name: ${this.process_name}`);
+		logger.info(LOG_CAT, `Target process names: ${this.process_names.join(', ')}`);
 	}
 
 	async detect_process_info(max_retries: number = 1): Promise<process_info | null> {
@@ -48,7 +57,7 @@ export class ProcessFinder {
 			logger.debug(LOG_CAT, `Attempt ${i + 1}/${max_retries}`);
 
 			try {
-				const cmd = this.strategy.get_process_list_command(this.process_name);
+				const cmd = this.strategy.get_process_list_command(this.process_names);
 				logger.debug(LOG_CAT, `Executing process list command:\n${cmd}`);
 
 				const {stdout, stderr} = await exec_async(cmd);
