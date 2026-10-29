@@ -98,14 +98,14 @@ describe('WindowsStrategy', () => {
 });
 
 describe('UnixStrategy', () => {
-	it('should generate process list command with regex pattern', () => {
+	it('should generate process list command with regex pattern including language_server', () => {
 		const macStrategy = new UnixStrategy('darwin');
-		const macCmd = macStrategy.get_process_list_command(['agy', 'language_server_macos']);
-		assert.ok(macCmd.includes('pgrep -fl "(agy|language_server_macos)"'));
+		const macCmd = macStrategy.get_process_list_command(['agy', 'language_server', 'language_server_macos_arm']);
+		assert.ok(macCmd.includes('pgrep -fl "(agy|language_server|language_server_macos_arm)"'));
 
 		const linuxStrategy = new UnixStrategy('linux');
-		const linuxCmd = linuxStrategy.get_process_list_command(['agy', 'language_server_linux_x64']);
-		assert.ok(linuxCmd.includes('pgrep -af "(agy|language_server_linux_x64)"'));
+		const linuxCmd = linuxStrategy.get_process_list_command(['agy', 'language_server', 'language_server_linux_x64']);
+		assert.ok(linuxCmd.includes('pgrep -af "(agy|language_server|language_server_linux_x64)"'));
 	});
 
 	it('should parse modern agy process line with --hub-port and --csrf_token', () => {
@@ -118,6 +118,18 @@ describe('UnixStrategy', () => {
 		assert.strictEqual(result?.[0].pid, 6200);
 		assert.strictEqual(result?.[0].extension_port, 60742);
 		assert.strictEqual(result?.[0].csrf_token, 'mac-token-5678');
+	});
+
+	it('should parse macOS language_server binary without platform suffix (Antigravity IDE 2.6.0+)', () => {
+		const strategy = new UnixStrategy('darwin');
+		const stdout = '4321 /Applications/Antigravity.app/Contents/Resources/bin/language_server --extension_server_port 50001 --app_data_dir /Users/test/Library/Application Support/antigravity --csrf_token mac-token-arm-123\n';
+
+		const result = strategy.parse_process_info(stdout);
+		assert.notStrictEqual(result, null);
+		assert.strictEqual(result?.length, 1);
+		assert.strictEqual(result?.[0].pid, 4321);
+		assert.strictEqual(result?.[0].extension_port, 50001);
+		assert.strictEqual(result?.[0].csrf_token, 'mac-token-arm-123');
 	});
 
 	it('should parse legacy language_server line with --extension_server_port', () => {
@@ -138,7 +150,7 @@ describe('UnixStrategy', () => {
 			'100 /usr/bin/unrelated',
 			'5000 /path/to/agy --hub --hub-port=60700 --app_data_dir=antigravity',
 			'6200 /path/to/agy --hub --hub-port=60742 --app_data_dir=antigravity --csrf_token=mac-token-1',
-			'7000 /path/to/language_server_macos --extension_server_port=50000 --app_data_dir antigravity --csrf_token=mac-token-2',
+			'7000 /path/to/language_server --extension_server_port=50000 --app_data_dir antigravity --csrf_token=mac-token-2',
 		].join('\n');
 
 		const result = strategy.parse_process_info(stdout);

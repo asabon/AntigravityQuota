@@ -36,12 +36,14 @@ export class ProcessFinder {
 			this.strategy = new UnixStrategy('darwin');
 			this.process_names = [
 				'agy',
+				'language_server',
 				`language_server_macos${process.arch === 'arm64' ? '_arm' : ''}`,
 			];
 		} else {
 			this.strategy = new UnixStrategy('linux');
 			this.process_names = [
 				'agy',
+				'language_server',
 				`language_server_linux${process.arch === 'arm64' ? '_arm' : '_x64'}`,
 			];
 		}

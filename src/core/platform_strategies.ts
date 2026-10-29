@@ -27,18 +27,19 @@ export class WindowsStrategy implements platform_strategy {
 
 	/**
 	 * Determine if a command line belongs to an Antigravity process.
-	 * Checks for --app_data_dir antigravity parameter, antigravity in the path, or agy --hub.
+	 * Checks for --app_data_dir parameter, antigravity in the path, or agy --hub.
 	 */
 	private is_antigravity_process(command_line: string): boolean {
 		const lower_cmd = command_line.toLowerCase();
 
-		// Match both --app_data_dir antigravity and --app_data_dir=antigravity
-		if (/--app_data_dir[=\s]+antigravity\b/i.test(command_line)) {
+		// Match --app_data_dir parameter containing antigravity
+		if (/--app_data_dir[=\s]+[^\s]*antigravity/i.test(command_line)) {
 			logger.debug('WindowsStrategy', `Process identified as Antigravity (--app_data_dir match)`);
 			return true;
 		}
 
-		if (lower_cmd.includes('\\antigravity\\') || lower_cmd.includes('/antigravity/')) {
+		// Match path containing antigravity
+		if (lower_cmd.includes('antigravity')) {
 			logger.debug('WindowsStrategy', `Process identified as Antigravity (path match)`);
 			return true;
 		}
@@ -252,18 +253,19 @@ export class UnixStrategy implements platform_strategy {
 
 	/**
 	 * Determine if a command line belongs to an Antigravity process.
-	 * Checks for --app_data_dir antigravity parameter, antigravity in the path, or agy --hub.
+	 * Checks for --app_data_dir parameter, antigravity in the path, or agy --hub.
 	 */
 	private is_antigravity_process(command_line: string): boolean {
 		const lower_cmd = command_line.toLowerCase();
 
-		// Match both --app_data_dir antigravity and --app_data_dir=antigravity
-		if (/--app_data_dir[=\s]+antigravity\b/i.test(command_line)) {
+		// Match --app_data_dir parameter containing antigravity
+		if (/--app_data_dir[=\s]+[^\s]*antigravity/i.test(command_line)) {
 			logger.debug('UnixStrategy', `Process identified as Antigravity (--app_data_dir match)`);
 			return true;
 		}
 
-		if (lower_cmd.includes('\\antigravity\\') || lower_cmd.includes('/antigravity/')) {
+		// Match path containing antigravity (e.g. /Applications/Antigravity.app/... or \antigravity\)
+		if (lower_cmd.includes('antigravity')) {
 			logger.debug('UnixStrategy', `Process identified as Antigravity (path match)`);
 			return true;
 		}
