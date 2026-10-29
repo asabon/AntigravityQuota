@@ -1,9 +1,12 @@
 # 003: Antigravity 新バックエンドプロセス（agy / agy.exe）の検出サポートと後方互換性維持 (Support for AGY Backend Process & Backward Compatibility)
 
 - **作成日**: 2026-10-29
-- **ステータス**: Draft
+- **ステータス**: Implemented
 - **対象コンポーネント**: `src/core/process_finder.ts`, `src/core/platform_strategies.ts`
-- **関連 Issue / PR**: 本家未報告（本提案から PR 提出予定）
+- **関連 Issue / PR**:
+  - 本家 Issue: [Henrik-3/AntigravityQuota#32](https://github.com/Henrik-3/AntigravityQuota/issues/32)
+  - 本家 PR: [Henrik-3/AntigravityQuota#33](https://github.com/Henrik-3/AntigravityQuota/pull/33)
+  - Fork PR: [asabon/AntigravityQuota#21](https://github.com/asabon/AntigravityQuota/pull/21)
 
 ---
 
@@ -20,12 +23,11 @@ Antigravity Quota (AGQ) は、VS Code / Antigravity IDE 上で動作し、IDE �
 AGQ の `ProcessFinder` は、OS に応じたプロセス名をハードコードし、OS コマンド（PowerShell / WMIC / pgrep）で該当プロセスを検索・特定していました。
 
 ### 1.2 課題・問題点 (Problem Statement)
-2026年10月下旬の Antigravity IDE（v1.107.0 等）のアップデートに伴い、バックエンド言語サーバーが従来の `language_server_*` から統合 CLI バイナリ **`agy.exe`**（macOS / Linux では **`agy`**）へ移行しました。
-
-この変更により、AGQ では以下の問題が発生し、拡張機能が完全に機能停止（プロセス検出失敗）する事態が発生しています：
+2026年10月下旬の Antigravity IDE（v2.6.0 / VS Code base v1.107.0 等）のアップデートに伴い、バックエンド言語サーバーのバイナリおよび引数仕様が刷新されました（本家 Issue [#32](https://github.com/Henrik-3/AntigravityQuota/issues/32) にて報告）：
 
 1. **プロセス検索が 0 件になる**:
-   `Get-CimInstance Win32_Process -Filter "name='language_server_windows_x64.exe'"` が該当プロセスなし（空文字 `0 chars`）を返却。
+   - **Windows**: `language_server_windows_*.exe` から `agy.exe`（`~/.gemini/bin/agy.exe`）に変更されたため、`Get-CimInstance` が空文字（`0 chars`）を返却。
+   - **macOS (Apple Silicon)**: バイナリ名が `language_server_macos_arm` ではなくサフィックスなしの `language_server`（または `agy`）に変更されたため、`pgrep` が失敗。
 2. **パースエラーによる起動失敗**:
    空文字に対して `JSON.parse` が実行され、`JSON parse error: Unexpected end of JSON input` が発生。
    結果として `Antigravity process not found` となり、クォータの取得・表示が一切行われなくなる。
@@ -74,18 +76,18 @@ PID 6200（`agy.exe`）がリッスンしているポートを調査：
 ## 3. 提案内容・機能仕様 (Proposed Solution & Architecture)
 
 ### 3.1 概要 (Overview)
-`ProcessFinder` および各 OS の `platform_strategy`（Windows / Unix）を拡張し、新バイナリ `agy` / `agy.exe` を最優先で検出しつつ、旧環境のユーザー向けに `language_server_*` もフォールバックとして検出できるように後方互換性を担保します。
+`ProcessFinder` および各 OS の `platform_strategy`（Windows / Unix）を拡張し、新バイナリ `agy` / `agy.exe` および macOS の `language_server` を検出しつつ、旧環境のユーザー向けに `language_server_*` もフォールバックとして検出できるように後方互換性を担保します。
 
 ### 3.2 プロセス検出の設計
 
 #### (1) 対象プロセス名のリスト化
-プラットフォームごとに優先順位付きのプロセス名候補を定義します：
+プラットフォームごとに優先順位付きのプロセス名候補を定義：
 
 | プラットフォーム | 探索対象プロセス名（優先順） |
 | :--- | :--- |
 | **Windows** | `agy.exe`<br>`language_server_windows_x64.exe`<br>`language_server_windows_arm.exe` |
-| **macOS** | `agy`<br>`language_server_macos`<br>`language_server_macos_arm` |
-| **Linux** | `agy`<br>`language_server_linux_x64`<br>`language_server_linux_arm` |
+| **macOS** | `agy`<br>`language_server`<br>`language_server_macos`<br>`language_server_macos_arm` |
+| **Linux** | `agy`<br>`language_server`<br>`language_server_linux_x64`<br>`language_server_linux_arm` |
 
 #### (2) プロセスリスト取得コマンドの更新
 
@@ -100,98 +102,46 @@ PID 6200（`agy.exe`）がリッスンしているポートを調査：
 - **macOS / Linux (UnixStrategy)**:
   `pgrep` の正規表現パターンマッチを利用：
   ```bash
-  LC_ALL=C pgrep -fl "(agy|language_server)"   # macOS
-  LC_ALL=C pgrep -af "(agy|language_server)"   # Linux
+  LC_ALL=C pgrep -fl "(agy|language_server|language_server_macos_arm)"   # macOS
+  LC_ALL=C pgrep -af "(agy|language_server|language_server_linux_x64)"  # Linux
   ```
 
-#### (3) 引数パース正規表現の強化
-
-- **`is_antigravity_process`**:
-  `--app_data_dir` の後にスペースだけでなく `=` が来るケースにも対応：
-  ```typescript
-  /--app_data_dir[=\s]+antigravity\b/i
-  ```
-- **ポート番号の抽出**:
-  `--extension_server_port` に加え `--hub-port` も許容：
-  ```typescript
-  const port_match = command_line.match(/--(?:extension_server_port|hub-port)[=\s]+(\d+)/i);
-  ```
-- **UnixStrategy の事前チェック緩和**:
-  従来 `if (!line.includes('--extension_server_port'))` で弾いていた部分を、`--csrf_token` か `--hub-port` があれば候補とするよう緩和。
+#### (3) 複数候補の順次評価と堅牢なポート疎通確認
+- `parse_process_info` は単一オブジェクトではなく、有効な候補配列（`process_candidate[]`）を返却。
+- CSRF トークンを持たない候補プロセス（親プロセス等）はスキップ。
+- `detect_process_info` で各候補のリッスンポートを順次評価し、ポート疎通に成功した最初の候補を採用。
 
 ---
 
-## 4. 実装計画・モジュール別変更点 (Implementation Plan)
+## 4. 実装完了・モジュール別変更点 (Implementation)
 
-- [ ] **`src/core/platform_strategies.ts`**:
+- [x] **`src/core/platform_strategies.ts`**:
   - `WindowsStrategy`:
     - `get_process_list_command`: 複数プロセス名に対応する WQL フィルタの生成。
-    - `is_antigravity_process`: `--app_data_dir[=\s]+antigravity` の正規表現対応。
-    - `parse_process_info`: `--hub-port` の正規表現抽出を追加。空文字時のエラーハンドリング改善。
-    - `get_error_messages`: エラーメッセージ内のプロセス名表示を更新。
+    - `is_antigravity_process`: `--app_data_dir[=\s]+[^\s]*antigravity`、パス、`agy --hub` 対応。
+    - `parse_process_info`: 複数候補の抽出、`--hub-port` 対応、空文字安全処理。
   - `UnixStrategy`:
-    - `get_process_list_command`: `(agy|language_server)` パターンによるプロセス検索。
-    - `is_antigravity_process`: `--app_data_dir` の `=` 区切り対応。
-    - `parse_process_info`: `--hub-port` 対応、フィルタ緩和。
-- [ ] **`src/core/process_finder.ts`**:
-  - プラットフォームごとのプロセス名指定を配列またはパターンに対応。
-  - ログ出力の更新（新旧プロセス名が分かるように調整）。
-- [ ] **検証・テスト**:
-  - TypeScript コンパイル (`npm run compile`)
-  - ESLint チェック (`npm run lint`)
-  - 単体テスト実行 (`npm run test`)
-  - 日本語混入チェック (`node .agents/scripts/check-no-japanese.mjs --all`)
-  - 実際の Antigravity IDE 上で拡張機能を読み込み、クォータが正常に表示されるか動作確認。
+    - `get_process_list_command`: `(agy|language_server|...)` パターン対応。
+    - `is_antigravity_process`: パス判定の緩和（macOS `/Applications/Antigravity.app` 等）。
+    - `parse_process_info`: 複数候補の配列返却。
+- [x] **`src/core/process_finder.ts`**:
+  - 各 OS の対象プロセス名リスト化（`agy`, `language_server`, 旧バイナリ）。
+  - 複数候補の順次ポート疎通確認ループの実装。
+- [x] **単体テスト (`src/test/platform_strategies.test.ts`)**:
+  - 全26パターンのテストを追加し、全て PASS。
 
 ---
 
 ## 5. 下位互換性とリスク (Backward Compatibility & Risks)
 
 - **完全な下位互換性**:
-  探索対象に従来の `language_server_*` を含めているため、まだ古いバージョンの Antigravity IDE を利用しているユーザー環境でもそのまま動作し続けます。
-- **リスク**:
-  `agy` という名前の無関係なプロセスが別ツール等で存在した場合の誤検出リスク。
-  → コマンドライン引数内に `--app_data_dir[=\s]+antigravity` または パスに `antigravity` が含まれていること、かつ `--csrf_token` が存在することを確認するため、誤検出のリスクは極めて低いです。
+  探索対象に従来の `language_server_*` を含めているため、古いバージョンの Antigravity IDE を利用しているユーザー環境でもそのまま動作し続けます。
+- **リスクヘッジ**:
+  `antigravity` の文字列チェックおよび `--csrf_token` の存在チェックにより、無関係なプロセスの誤検出を防止。
 
 ---
 
-## 6. 本家（upstream）向け PR / Issue ドラフト (English Draft for Upstream)
+## 6. 本家（upstream）向け PR 情報
 
-### Title
-```
-fix: support new agy backend process and argument formats
-```
-
-### Description
-```markdown
-## Summary
-Resolves extension activation failure on recent Antigravity IDE updates (v1.107.0+) by adding support for the new `agy` / `agy.exe` backend process alongside backward compatibility for legacy `language_server_*` processes.
-
-## Motivation & Problem
-Recent updates to the Antigravity IDE replaced the legacy language server binaries (`language_server_windows_x64.exe`, `language_server_macos`, `language_server_linux_*`) with a unified CLI binary `agy.exe` / `agy`.
-
-Consequently, AGQ failed to find the process:
-- `ProcessFinder` targeted only `language_server_*`, resulting in empty process list outputs (`Raw stdout (0 chars)`).
-- JSON parsing failed with `Unexpected end of JSON input`.
-- The extension terminated with `Antigravity process not found`.
-
-In addition:
-- CLI parameters now use `--app_data_dir=antigravity` (with `=`) rather than space-separated flags.
-- Port parameters now use `--hub-port=<port>` in addition to legacy `--extension_server_port`.
-
-## Solution & Implementation Details
-1. **Multi-process Name Support**:
-   - Updated `ProcessFinder` and platform strategies to query both `agy` (`agy.exe`) and legacy `language_server_*` binaries.
-   - Preserves 100% backward compatibility for older Antigravity installations.
-2. **Flexible Flag Parsing**:
-   - Updated `is_antigravity_process` regex to match both `--app_data_dir=antigravity` and `--app_data_dir antigravity`.
-   - Updated port parsing to extract ports from either `--hub-port` or `--extension_server_port`.
-   - Relaxed Unix strategy filter to recognize processes containing `--csrf_token` or `--hub-port`.
-
-## Verification
-- Tested on Windows x64 with Antigravity IDE v1.107.0:
-  - Successfully detected `agy.exe` (PID and CSRF token correctly parsed).
-  - Port scanner identified the active HTTPS listening port.
-  - Quota data retrieved and displayed in the status bar without errors.
-- Verified lint, unit tests, and compilation pass without warnings.
-```
+- **PR**: [Henrik-3/AntigravityQuota#33](https://github.com/Henrik-3/AntigravityQuota/pull/33)
+- **タイトル**: `fix: support new agy backend process and argument formats (fixes #32)`
