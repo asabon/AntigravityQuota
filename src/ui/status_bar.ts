@@ -3,7 +3,8 @@
  */
 
 import * as vscode from 'vscode';
-import {quota_snapshot, quota_group_info, display_mode} from '../utils/types';
+import {quota_snapshot, model_quota_info, quota_group_info, display_mode} from '../utils/types';
+import {ConfigManager} from '../core/config_manager';
 
 /** Mapping of model labels to short abbreviations for status bar display */
 const MODEL_ABBREVIATIONS: Record<string, string> = {
@@ -80,6 +81,15 @@ export function format_group_status(group: quota_group_info): string {
 }
 
 /**
+ * Escape regular expression special characters
+ * @param str Input string
+ * @returns Escaped regex string
+ */
+function escape_regex(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Check if a quota group is pinned for status bar display
  */
 export function is_group_pinned(group_name: string, pinned_groups: string[]): boolean {
@@ -90,7 +100,12 @@ export function is_group_pinned(group_name: string, pinned_groups: string[]): bo
 	const full_name = group_name.toLowerCase();
 	return pinned_groups.some(p => {
 		const target = p.toLowerCase();
-		return target === short_name || target === full_name || full_name.includes(target);
+		if (target === short_name || target === full_name) {
+			return true;
+		}
+		// Word-boundary matching (e.g. 'GPT' or 'Claude' matches 'Claude and GPT models' or 'Claude/GPT')
+		const regex = new RegExp(`(^|[\\s/\\-_,.])${escape_regex(target)}($|[\\s/\\-_,.])`, 'i');
+		return regex.test(full_name) || regex.test(short_name);
 	});
 }
 
@@ -105,6 +120,7 @@ export function draw_progress_bar(percentage: number): string {
 export class StatusBarManager {
 	private item: vscode.StatusBarItem;
 	private last_snapshot: quota_snapshot | undefined;
+	private config_manager = new ConfigManager();
 
 	constructor() {
 		this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -128,15 +144,16 @@ export class StatusBarManager {
 	update(snapshot: quota_snapshot, show_credits: boolean, mode?: display_mode) {
 		this.last_snapshot = snapshot;
 
-		const config = vscode.workspace.getConfiguration('agq');
-		const current_mode: display_mode = mode ?? config.get<display_mode>('displayMode') ?? 'models';
+		const resolved_config = this.config_manager.get_config();
+		const current_mode: display_mode = mode ?? resolved_config.display_mode ?? 'models';
 		const pinned = this.get_pinned_models();
 		const parts: string[] = [];
+		const has_groups = !!(snapshot.groups && snapshot.groups.length > 0);
 
 		// 1. Group limits
-		if ((current_mode === 'groups' || current_mode === 'both') && snapshot.groups && snapshot.groups.length > 0) {
+		if ((current_mode === 'groups' || current_mode === 'both') && has_groups) {
 			const pinned_groups = this.get_pinned_groups();
-			for (const group of snapshot.groups) {
+			for (const group of snapshot.groups!) {
 				if (is_group_pinned(group.display_name, pinned_groups)) {
 					parts.push(format_group_status(group));
 				}
@@ -144,7 +161,8 @@ export class StatusBarManager {
 		}
 
 		// 2. Individual pinned models
-		if (current_mode === 'models' || current_mode === 'both' || (current_mode === 'groups' && parts.length === 0)) {
+		// Fall back to models in 'groups' mode only if quota group data itself is unavailable or empty.
+		if (current_mode === 'models' || current_mode === 'both' || (current_mode === 'groups' && !has_groups)) {
 			const pinned_models = snapshot.models
 				.filter(m => pinned.includes(m.model_id))
 				.sort((a, b) => a.label.localeCompare(b.label));
@@ -172,6 +190,17 @@ export class StatusBarManager {
 		this.item.show();
 	}
 
+	/**
+	 * Re-render status bar using the cached quota snapshot
+	 * @param show_credits Whether to show prompt credits
+	 * @param mode Display mode (models, groups, or both)
+	 */
+	refresh_cached_snapshot(show_credits: boolean, mode?: display_mode) {
+		if (this.last_snapshot) {
+			this.update(this.last_snapshot, show_credits, mode);
+		}
+	}
+
 	show_menu() {
 		const pick = vscode.window.createQuickPick();
 		pick.title = 'Antigravity Quota';
@@ -190,25 +219,28 @@ export class StatusBarManager {
 
 		pick.onDidAccept(async () => {
 			if (currentActiveItem && 'group_name' in currentActiveItem) {
-				await this.toggle_pinned_group((currentActiveItem as any).group_name);
+				await this.toggle_pinned_group(
+					(currentActiveItem as any).group_name,
+					(currentActiveItem as any).group_display_name
+				);
 				pick.items = this.build_menu_items();
 				if (this.last_snapshot) {
-					const config = vscode.workspace.getConfiguration('agq');
+					const cfg = this.config_manager.get_config();
 					this.update(
 						this.last_snapshot,
-						!!config.get('showPromptCredits'),
-						config.get<display_mode>('displayMode')
+						cfg.show_prompt_credits ?? false,
+						cfg.display_mode
 					);
 				}
 			} else if (currentActiveItem && 'model_id' in currentActiveItem) {
 				await this.toggle_pinned_model((currentActiveItem as any).model_id);
 				pick.items = this.build_menu_items();
 				if (this.last_snapshot) {
-					const config = vscode.workspace.getConfiguration('agq');
+					const cfg = this.config_manager.get_config();
 					this.update(
 						this.last_snapshot,
-						!!config.get('showPromptCredits'),
-						config.get<display_mode>('displayMode')
+						cfg.show_prompt_credits ?? false,
+						cfg.display_mode
 					);
 				}
 			}
@@ -226,15 +258,25 @@ export class StatusBarManager {
 		return config.get<string[]>('pinnedModels') || [];
 	}
 
+	/**
+	 * Get list of pinned quota group identifiers from configuration
+	 * @returns Array of pinned group names or keys
+	 */
 	private get_pinned_groups(): string[] {
 		const config = vscode.workspace.getConfiguration('agq');
 		return config.get<string[]>('pinnedGroups') || [];
 	}
 
-	private async toggle_pinned_group(group_key: string): Promise<void> {
+	/**
+	 * Toggle pin status for a quota group in global configuration
+	 * @param group_key Short key or identifier of the group
+	 * @param group_display_name Full display name of the group
+	 */
+	private async toggle_pinned_group(group_key: string, group_display_name?: string): Promise<void> {
 		const config = vscode.workspace.getConfiguration('agq');
 		let pinned = [...(config.get<string[]>('pinnedGroups') || [])];
 		const all_groups = (this.last_snapshot?.groups || []).map(g => get_group_short_name(g.display_name));
+		const display_name = group_display_name || group_key;
 
 		if (pinned.length === 0) {
 			pinned = all_groups.filter(g => g.toLowerCase() !== group_key.toLowerCase());
@@ -242,9 +284,9 @@ export class StatusBarManager {
 				pinned = ['none'];
 			}
 		} else {
-			const index = pinned.findIndex(p => p.toLowerCase() === group_key.toLowerCase());
-			if (index >= 0) {
-				pinned.splice(index, 1);
+			const remaining = pinned.filter(p => !is_group_pinned(display_name, [p]));
+			if (remaining.length !== pinned.length) {
+				pinned = remaining;
 				if (pinned.length === 0) {
 					pinned = ['none'];
 				}
@@ -305,10 +347,11 @@ export class StatusBarManager {
 					: '';
 
 				// Parent Header Item with Checkmark
-				const parent_item: vscode.QuickPickItem & {group_name?: string} = {
+				const parent_item: vscode.QuickPickItem & {group_name?: string; group_display_name?: string} = {
 					label: `${selection_icon} ${status_icon ? status_icon + ' ' : ''}${group.display_name}`,
 				};
 				parent_item.group_name = short_name;
+				parent_item.group_display_name = group.display_name;
 				items.push(parent_item);
 
 				// Child Bucket Items (Indented, vertical progress bars)
@@ -318,11 +361,12 @@ export class StatusBarManager {
 					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);
 					const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
 
-					const child_item: vscode.QuickPickItem & {group_name?: string} = {
+					const child_item: vscode.QuickPickItem & {group_name?: string; group_display_name?: string} = {
 						label: `      ${window_label}: ${bar} ${pct_display}`,
 						description: `Resets in: ${bucket.time_until_reset_formatted}`,
 					};
 					child_item.group_name = short_name;
+					child_item.group_display_name = group.display_name;
 					items.push(child_item);
 				}
 			}
