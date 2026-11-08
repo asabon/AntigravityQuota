@@ -34,10 +34,11 @@ git switch -c docs/<topic-name>
 #### Step 3: テンプレートからのドラフト作成
 [docs/proposals/TEMPLATE.md](file:///e:/work/AntigravityQuota/docs/proposals/TEMPLATE.md) をコピーし、`docs/proposals/XXX-<topic-name>.md` を作成して各セクションを記述します。
 - 背景と課題
-- 技術調査・API レスポンス（エビデンス）
+- 技術調査・実機検証エビデンス（推測ではなく実際の OS、バージョン、プロセス名、PID、ポート番号等の動作確認データ）
 - UI/UX 仕様（プラン差分への動的適応含む）
+- 下位互換性と共存設計（既存環境の上書き削除を避け、フォールバック配列を採用）
 - 実装計画チェックリスト
-- 本家向け PR ドラフト（英語）
+- 本家向け PR ドラフト（英語: Motivation, Proposed Changes, Verification。※バージョン更新や CHANGELOG は含めない）
 
 #### Step 4: ユーザーレビューと develop への先行マージ
 1. ユーザーに提案内容を提示し、仕様の合意を得る。
@@ -103,6 +104,13 @@ git diff upstream/main --stat   # docs/ や .agents/ が含まれていないこ
 git push -u origin pr/<topic-name>
 # (提案書内の英語ドラフトを使って本家へ PR 作成)
 ```
+
+> 🎯 **本家 PR 提出前チェックリスト（過去の却下・停滞 PR からの教訓）**:
+> 1. **実機検証エビデンス**: PR 本文の `Verification` に動作確認した OS、バージョン、PID、ポート等の実測データが記載されているか？（推測は不可）
+> 2. **最小スコープ & オーナー領域の尊重**: `package.json` のバージョン変更や `CHANGELOG.md` を書き換えていないか？
+> 3. **下位互換性**: 既存のプロセス名や設定を削除せず、フォールバック配列等で共存させているか？
+> 4. **完全英語 & 有効リンク**: コードコメント・PR 本文が 100% 英語で、リンク切れがないか？
+> 5. **CodeRabbit 警告ゼロ**: Fork PR 上で CodeRabbit による指摘がすべて解決済みか？
 
 ---
 

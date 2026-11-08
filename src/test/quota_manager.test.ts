@@ -1,7 +1,8 @@
-import './setup';
+import { setMockConfig, resetMockConfig, getMockConfig } from './setup';
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import { QuotaManager } from '../core/quota_manager';
+import { ConfigManager } from '../core/config_manager';
 import { StatusBarManager, format_group_status, get_abbreviation, draw_progress_bar, is_group_pinned, get_group_short_name } from '../ui/status_bar';
 import { server_user_status_response, server_user_quota_summary_response, quota_group_info, quota_snapshot } from '../utils/types';
 
@@ -158,6 +159,31 @@ describe('QuotaManager - parse_response integration & fallback', () => {
 		assert.strictEqual(snapshot.models[0].label, 'Gemini 3.8 Flash (Low)');
 		assert.strictEqual(snapshot.groups, undefined);
 	});
+
+	it('should gracefully fallback when RetrieveUserQuotaSummary rejects during fetch_quota', async () => {
+		const qm_fetch = new QuotaManager();
+		(qm_fetch as any).request = async <T>(path: string): Promise<T> => {
+			if (path.includes('GetUserStatus')) {
+				return mockUserStatus as unknown as T;
+			}
+			if (path.includes('RetrieveUserQuotaSummary')) {
+				throw new Error('Endpoint not available');
+			}
+			throw new Error(`Unexpected path: ${path}`);
+		};
+
+		let received_snapshot: quota_snapshot | undefined;
+		qm_fetch.on_update(snapshot => {
+			received_snapshot = snapshot;
+		});
+
+		await qm_fetch.fetch_quota();
+
+		assert.ok(received_snapshot);
+		assert.strictEqual(received_snapshot.models.length, 1);
+		assert.strictEqual(received_snapshot.models[0].label, 'Gemini 3.8 Flash (Low)');
+		assert.strictEqual(received_snapshot.groups, undefined);
+	});
 });
 
 describe('StatusBar Formatting - format_group_status', () => {
@@ -286,6 +312,10 @@ describe('UI Utilities', () => {
 	it('should filter pinned groups correctly', () => {
 		assert.strictEqual(is_group_pinned('Gemini Models', []), true);
 		assert.strictEqual(is_group_pinned('Gemini Models', ['Gemini']), true);
+		assert.strictEqual(is_group_pinned('Gemini 4 Argon', ['Gemini']), false);
+		assert.strictEqual(is_group_pinned('Gemini 4 Argon', ['Gemini 4 Argon']), true);
+		assert.strictEqual(is_group_pinned('Gemini 4 Argon', ['Argon']), true);
+		assert.strictEqual(is_group_pinned('Gemini Models', ['Gemini 4 Argon']), false);
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Gemini']), false);
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude']), true);
 		assert.strictEqual(is_group_pinned('Claude and GPT models', ['Claude and GPT models']), true);
@@ -296,7 +326,9 @@ describe('UI Utilities', () => {
 
 	it('should get short name for quota groups', () => {
 		assert.strictEqual(get_group_short_name('Gemini Models'), 'Gemini');
+		assert.strictEqual(get_group_short_name('Gemini 4 Argon'), 'Gemini 4 Argon');
 		assert.strictEqual(get_group_short_name('Claude and GPT models'), 'Claude/GPT');
+		assert.strictEqual(get_group_short_name('Custom Future Models'), 'Custom Future');
 	});
 });
 
@@ -347,16 +379,173 @@ describe('StatusBarManager - build_menu_items', () => {
 		const parentItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('Gemini Models'));
 		assert.ok(parentItem);
 		assert.ok(parentItem.label.includes('$(check)'));
+		assert.strictEqual((parentItem as any).group_display_name, 'Gemini Models');
 
 		// Check child bucket items
 		const weeklyItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('Weekly:'));
 		assert.ok(weeklyItem);
 		assert.ok(weeklyItem.label.includes('▓▓▓▓▓▓▓▓░░ 80.0%'));
 		assert.strictEqual(weeklyItem.description, 'Resets in: 3d');
+		assert.strictEqual((weeklyItem as any).group_display_name, 'Gemini Models');
 
 		const fiveHourItem = items.find(i => (i as any).group_name === 'Gemini' && i.label.includes('5-Hour:'));
 		assert.ok(fiveHourItem);
 		assert.ok(fiveHourItem.label.includes('▓▓▓▓▓▓▓░░░ 70.0%'));
 		assert.strictEqual(fiveHourItem.description, 'Resets in: 3h');
+		assert.strictEqual((fiveHourItem as any).group_display_name, 'Gemini Models');
+	});
+
+	it('should unpin groups matching by full name or substring in toggle_pinned_group', async () => {
+		resetMockConfig();
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [],
+			groups: [
+				{
+					display_name: 'Claude and GPT models',
+					buckets: [],
+				},
+				{
+					display_name: 'Gemini Models',
+					buckets: [],
+				},
+			],
+		};
+		sb.update(snapshot, false, 'groups');
+
+		// 1. Unpin when pinned via substring "GPT"
+		setMockConfig('agq.pinnedGroups', ['GPT', 'Gemini']);
+		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['Gemini']);
+
+		// 2. Unpin when pinned via full name
+		setMockConfig('agq.pinnedGroups', ['Claude and GPT models']);
+		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['none']);
+
+		// 3. Pin new group when not pinned
+		setMockConfig('agq.pinnedGroups', ['Gemini']);
+		await (sb as any).toggle_pinned_group('Claude/GPT', 'Claude and GPT models');
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['Gemini', 'Claude/GPT']);
+
+		// 4. Unpinning Gemini 4 Argon should not unpin Gemini Models
+		setMockConfig('agq.pinnedGroups', ['Gemini', 'Gemini 4 Argon']);
+		await (sb as any).toggle_pinned_group('Gemini 4 Argon', 'Gemini 4 Argon');
+		assert.deepStrictEqual(getMockConfig('agq.pinnedGroups'), ['Gemini']);
+	});
+
+	it('should not fallback to models in groups mode when groups exist but none match pinned filter', () => {
+		resetMockConfig();
+		setMockConfig('agq.pinnedGroups', ['none']);
+		setMockConfig('agq.pinnedModels', ['gemini-3.8-flash-low']);
+
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [
+				{
+					label: 'Gemini 3.8 Flash (Low)',
+					model_id: 'gemini-3.8-flash-low',
+					remaining_percentage: 90,
+					is_exhausted: false,
+					reset_time: new Date(),
+					time_until_reset: 1000,
+					time_until_reset_formatted: '1h',
+				},
+			],
+			groups: [
+				{
+					display_name: 'Gemini Models',
+					buckets: [
+						{
+							bucket_id: 'gemini-5h',
+							display_name: 'Five Hour',
+							window: '5h',
+							remaining_percentage: 90,
+							is_exhausted: false,
+							reset_time: new Date(),
+							time_until_reset: 1000,
+							time_until_reset_formatted: '1h',
+						},
+					],
+				},
+			],
+		};
+
+		sb.update(snapshot, false, 'groups');
+		assert.strictEqual((sb as any).item.text, '$(rocket) AGQ');
+	});
+
+	it('should fallback to models in groups mode when quota groups are unavailable or empty', () => {
+		resetMockConfig();
+		setMockConfig('agq.pinnedModels', ['gemini-3.8-flash-low']);
+
+		const sb = new StatusBarManager();
+		const snapshot: quota_snapshot = {
+			timestamp: new Date(),
+			models: [
+				{
+					label: 'Gemini 3.8 Flash',
+					model_id: 'gemini-3.8-flash-low',
+					remaining_percentage: 90,
+					is_exhausted: false,
+					reset_time: new Date(),
+					time_until_reset: 1000,
+					time_until_reset_formatted: '1h',
+				},
+			],
+			groups: undefined,
+		};
+
+		sb.update(snapshot, false, 'groups');
+		assert.ok((sb as any).item.text.includes('G3F: 90%'));
+	});
+});
+
+describe('ConfigManager - legacy agQuota fallback', () => {
+	it('should read from agq when present', () => {
+		resetMockConfig();
+		setMockConfig('agq.enabled', false);
+		setMockConfig('agq.pollingInterval', 60);
+		setMockConfig('agq.showPromptCredits', true);
+		setMockConfig('agq.displayMode', 'groups');
+
+		const cm = new ConfigManager();
+		const config = cm.get_config();
+
+		assert.strictEqual(config.enabled, false);
+		assert.strictEqual(config.polling_interval, 60000);
+		assert.strictEqual(config.show_prompt_credits, true);
+		assert.strictEqual(config.display_mode, 'groups');
+	});
+
+	it('should gracefully fallback to agQuota when agq is unset', () => {
+		resetMockConfig();
+		setMockConfig('agQuota.enabled', false);
+		setMockConfig('agQuota.pollingInterval', 90);
+		setMockConfig('agQuota.showPromptCredits', true);
+
+		const cm = new ConfigManager();
+		const config = cm.get_config();
+
+		assert.strictEqual(config.enabled, false);
+		assert.strictEqual(config.polling_interval, 90000);
+		assert.strictEqual(config.show_prompt_credits, true);
+		assert.strictEqual(config.display_mode, 'models');
+	});
+
+	it('should prioritize explicit agq over legacy agQuota', () => {
+		resetMockConfig();
+		setMockConfig('agQuota.enabled', false);
+		setMockConfig('agq.enabled', true);
+		setMockConfig('agQuota.pollingInterval', 90);
+		setMockConfig('agq.pollingInterval', 45);
+
+		const cm = new ConfigManager();
+		const config = cm.get_config();
+
+		assert.strictEqual(config.enabled, true);
+		assert.strictEqual(config.polling_interval, 45000);
 	});
 });

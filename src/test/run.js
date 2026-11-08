@@ -13,6 +13,11 @@ const testFiles = fs.readdirSync(testDir)
 	.filter((file) => file.endsWith('.test.js'))
 	.map((file) => path.join(testDir, file));
 
+if (testFiles.length === 0) {
+	console.error(`No *.test.js files found in ${testDir}.`);
+	process.exit(1);
+}
+
 const stream = run({ files: testFiles });
 stream.on('test:fail', () => {
 	process.exitCode = 1;
