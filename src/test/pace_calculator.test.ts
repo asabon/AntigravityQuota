@@ -4,7 +4,6 @@ import * as assert from 'node:assert';
 import {
 	calculate_weekly_pace,
 	WEEKLY_CYCLE_MS,
-	PACE_CRITICAL_THRESHOLD,
 } from '../core/pace_calculator';
 import {
 	format_group_status,
