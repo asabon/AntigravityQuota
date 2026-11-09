@@ -1,9 +1,11 @@
 # Proposal 004: Distinguish "Gemini 4 Argon" and "Gemini Models" Quota Groups
 
 - **作成日**: 2026-10-31
-- **ステータス**: Draft / Ready for Discussion
+- **ステータス**: Implemented (Merged in upstream v1.2.2)
 - **対象コンポーネント**: `src/ui/status_bar.ts`, `src/test/quota_manager.test.ts`
-- **関連 Issue / PR**: N/A (Preparing for upstream consultation)
+- **関連 Issue / PR**:
+  - 本家 PR: [Henrik-3/AntigravityQuota#36](https://github.com/Henrik-3/AntigravityQuota/pull/36)
+  - Fork PR: [asabon/AntigravityQuota#26](https://github.com/asabon/AntigravityQuota/pull/26)
 
 ---
 
