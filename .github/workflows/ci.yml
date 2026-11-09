@@ -40,5 +40,8 @@ jobs:
       - name: Run Unit Tests
         run: npm run test
 
+      - name: Verify VSIX Packaging
+        run: npm run node:vsix:package
+
       - name: Check for Japanese in src/
         run: node .agents/scripts/check-no-japanese.mjs --all
