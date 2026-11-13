@@ -45,15 +45,41 @@ describe('ProcessFinder Native Integration', () => {
 		});
 
 		cleanup_tasks.push(async () => {
-			if (!child.killed) {
+			if (child.exitCode === null && !child.killed) {
 				child.kill('SIGTERM');
+				// Wait for child process to actually exit with escalation
+				await new Promise<void>((resolve) => {
+					if (child.exitCode !== null) {
+						return resolve();
+					}
+					const exit_timeout = setTimeout(() => {
+						try {
+							child.kill('SIGKILL');
+						} catch {
+							// ignore
+						}
+						resolve();
+					}, 2000);
+
+					child.once('exit', () => {
+						clearTimeout(exit_timeout);
+						resolve();
+					});
+				});
 			}
-			// Wait a bit before deleting binary to allow OS to release file handle
-			await new Promise(r => setTimeout(r, 200));
-			try {
-				fs.rmSync(tmp_dir, {recursive: true, force: true});
-			} catch {
-				// ignore on Windows if lock is briefly retained
+
+			// Clean up temp directory with bounded retries for OS file release
+			for (let attempt = 0; attempt < 5; attempt++) {
+				try {
+					fs.rmSync(tmp_dir, {recursive: true, force: true});
+					break;
+				} catch (err) {
+					if (attempt === 4) {
+						console.warn(`Failed to remove test temp directory ${tmp_dir}:`, err);
+					} else {
+						await new Promise(r => setTimeout(r, 100));
+					}
+				}
 			}
 		});
 
@@ -65,7 +91,7 @@ describe('ProcessFinder Native Integration', () => {
 			let buffer = '';
 			child.stdout?.on('data', (data: Buffer) => {
 				buffer += data.toString();
-				const match = buffer.match(/READY:(\d+)/);
+				const match = buffer.match(/READY:(\d+)\r?\n/);
 				if (match) {
 					clearTimeout(timeout);
 					resolve(parseInt(match[1], 10));
