@@ -32,7 +32,15 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && github.event_name == 'pull_request'
         run: node .agents/scripts/check-branch-isolation.mjs --branch "${{ github.head_ref }}" --base "origin/${{ github.base_ref }}"
 
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Run ESLint
