@@ -179,13 +179,21 @@ export class ProcessFinder {
 
 	private test_port(port: number, csrf_token: string): Promise<boolean> {
 		return new Promise(resolve => {
-			const options = {
+			const payload = JSON.stringify({
+				metadata: {
+					ideName: 'antigravity',
+					extensionName: 'antigravity',
+					locale: 'en',
+				},
+			});
+			const options: https.RequestOptions = {
 				hostname: '127.0.0.1',
 				port,
-				path: '/exa.language_server_pb.LanguageServerService/GetUnleashData',
+				path: '/exa.language_server_pb.LanguageServerService/GetUserStatus',
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
+					'Content-Length': Buffer.byteLength(payload),
 					'X-Codeium-Csrf-Token': csrf_token,
 					'Connect-Protocol-Version': '1',
 				},
@@ -226,7 +234,7 @@ export class ProcessFinder {
 				resolve(false);
 			});
 
-			req.write(JSON.stringify({wrapper_data: {}}));
+			req.write(payload);
 			req.end();
 		});
 	}
