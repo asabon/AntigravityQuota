@@ -85,6 +85,12 @@
           },
           "description": "Quota group names to display in the status bar (e.g. ['Gemini', 'Claude']). If empty, all groups are displayed.",
           "order": 6
+        },
+        "agq.showWeeklyPaceIndicator": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show weekly quota consumption pace indicator badge (🟢/🟡/🔴) on status bar and menus.",
+          "order": 7
         }
       }
     }

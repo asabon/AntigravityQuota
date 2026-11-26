@@ -51,12 +51,14 @@ export class ConfigManager {
 		const polling_interval_sec = this.resolve_value<number>('pollingInterval', 120);
 		const show_prompt_credits = this.resolve_value<boolean>('showPromptCredits', false);
 		const display_mode = this.resolve_value<display_mode>('displayMode', 'models');
+		const show_weekly_pace_indicator = this.resolve_value<boolean>('showWeeklyPaceIndicator', true);
 
 		return {
 			enabled,
 			polling_interval: Math.max(30, polling_interval_sec) * 1000,
 			show_prompt_credits,
 			display_mode,
+			show_weekly_pace_indicator,
 		};
 	}
 
