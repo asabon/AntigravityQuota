@@ -349,10 +349,15 @@ export class StatusBarManager {
 		if (mode !== needed && mode !== 'both') {
 			const config = vscode.workspace.getConfiguration('agq');
 			const inspected = config.inspect<display_mode>('displayMode');
+			const legacy_inspected = vscode.workspace.getConfiguration('agQuota').inspect<display_mode>('displayMode');
 			const target =
 				inspected?.workspaceFolderValue !== undefined
 					? vscode.ConfigurationTarget.WorkspaceFolder
 					: inspected?.workspaceValue !== undefined
+					? vscode.ConfigurationTarget.Workspace
+					: inspected?.globalValue === undefined && legacy_inspected?.workspaceFolderValue !== undefined
+					? vscode.ConfigurationTarget.WorkspaceFolder
+					: inspected?.globalValue === undefined && legacy_inspected?.workspaceValue !== undefined
 					? vscode.ConfigurationTarget.Workspace
 					: vscode.ConfigurationTarget.Global;
 			await config.update('displayMode', 'both', target);

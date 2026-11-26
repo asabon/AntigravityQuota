@@ -151,4 +151,53 @@ describe('StatusBarManager - menu focus restore and displayMode widening', () =>
 			assert.strictEqual(displayModeUpdate.target, tc.expectedTarget, `${tc.name}: target mismatch`);
 		}
 	});
+
+	it('should preserve Workspace/WorkspaceFolder scope when only legacy agQuota.displayMode is overridden', async () => {
+		const cases = [
+			{
+				name: 'Legacy WorkspaceFolder',
+				legacyInspect: {workspaceFolderValue: 'groups', workspaceValue: undefined, globalValue: undefined},
+				expectedTarget: vscode.ConfigurationTarget.WorkspaceFolder,
+			},
+			{
+				name: 'Legacy Workspace',
+				legacyInspect: {workspaceFolderValue: undefined, workspaceValue: 'groups', globalValue: undefined},
+				expectedTarget: vscode.ConfigurationTarget.Workspace,
+			},
+		];
+
+		for (const tc of cases) {
+			resetMockConfig();
+			setMockConfig('agQuota.displayMode', 'groups');
+
+			const updates: Array<{section?: string; key: string; value: any; target: number}> = [];
+			vscode.workspace.getConfiguration = (section?: string) => {
+				const base = origGetConfiguration(section);
+				return {
+					...base,
+					inspect: (key: string) => {
+						if (key === 'displayMode') {
+							if (section === 'agQuota') {
+								return tc.legacyInspect;
+							}
+							return {workspaceFolderValue: undefined, workspaceValue: undefined, globalValue: undefined};
+						}
+						return base.inspect(key);
+					},
+					update: async (key: string, value: any, target: number) => {
+						updates.push({section, key, value, target});
+						return base.update(key, value, target);
+					},
+				};
+			};
+
+			const manager = new StatusBarManager();
+			await (manager as any).toggle_pinned_model('gemini-4-hydrogen');
+
+			const displayModeUpdate = updates.find(u => u.section === 'agq' && u.key === 'displayMode');
+			assert.ok(displayModeUpdate, `${tc.name}: agq.displayMode should be updated`);
+			assert.strictEqual(displayModeUpdate.value, 'both');
+			assert.strictEqual(displayModeUpdate.target, tc.expectedTarget, `${tc.name}: target mismatch`);
+		}
+	});
 });
