@@ -1,0 +1,44 @@
+name: Auto-fix CodeRabbit Reviews
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: coderabbit-autofix-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    if: >
+      github.event.review.user.login == 'coderabbitai[bot]' &&
+      github.event.review.state != 'approved'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Antigravity CodeRabbit Autofix
+        uses: asabon/antigravity-coderabbit-autofix@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          antigravity-api-key: ${{ secrets.ANTIGRAVITY_API_KEY }}
+          test-command: "npm test"
+          max-attempts: 3
+          ignore-nitpicks: true
