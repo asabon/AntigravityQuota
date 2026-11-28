@@ -62,3 +62,23 @@
 - **Weekly quota pace indicator**（本家 Issue [`#30`](https://github.com/Henrik-3/AntigravityQuota/issues/30) 対応）
   - Fork PR: [`asabon/AntigravityQuota#12`](https://github.com/asabon/AntigravityQuota/pull/12)（`feature/weekly-pace-indicator`）が Open 中。
   - 上記 Step 1〜3 の状況を見つつ、改めて仕上げ・同期・提出を検討する。
+
+---
+
+## Fork 品質・CI 改善ロードマップ（旧 Issue #19 統合）
+
+Fork [`#19`](https://github.com/asabon/AntigravityQuota/issues/19) で管理していた静的解析・CI・コード品質改善タスクもここで一元管理します。
+
+### 完了済み項目
+- [x] **TypeScript 型チェックの厳格化（Strict Type-checking）** — Fork PR #30 (`9772c05`) → **本家 PR [`#40`](https://github.com/Henrik-3/AntigravityQuota/pull/40) マージ済み**
+- [x] **PR CI での VSIX パッケージング検証** — Fork PR #29 (`33d04e1`)
+- [x] **CI のマルチ OS マトリックス化 & キャッシュ導入** — Fork PR #34 (`4f62f3b`)
+- [x] **ネイティブ OS プロセス・ポート検出結合テストの実装** — Fork PR #32 (`33dae9b`、本ドキュメントの **Step 3** にて拡充・本家還元予定)
+- [x] **CodeRabbit レビュー自動修正ワークフロー (`coderabbit-autofix.yml`)** — Fork PR #40 (`f3e8c1f`)
+
+### 未着手バックログ（必要に応じて個別 Issue を起票して着手）
+- [ ] **Prettier の導入 & フォーマットチェック**（`.prettierrc` + CI での `prettier --check`）
+- [ ] **テストカバレッジ測定 & 閾値チェック**（Node.js `--experimental-test-coverage` 等）
+- [ ] **CodeQL（セキュリティ静的解析）の導入**（`github/codeql-action`）
+- [ ] **Commitlint（Conventional Commits 検証）の導入**（PR タイトル / コミット規約チェック）
+
