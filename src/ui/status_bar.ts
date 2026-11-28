@@ -228,9 +228,18 @@ export class StatusBarManager {
 		const rebuild_items = () => {
 			const active: any = currentActiveItem;
 			pick.items = this.build_menu_items();
-			const same = pick.items.find((i: any) =>
-				active && (active.model_id ? i.model_id === active.model_id : i.group_name === active.group_name && i.label === active.label)
-			);
+			const same = pick.items.find((i: any) => {
+				if (!active) return false;
+				if (active.model_id) {
+					return i.model_id === active.model_id;
+				}
+				return (
+					active.group_name !== undefined &&
+					i.group_name === active.group_name &&
+					i.group_display_name === active.group_display_name &&
+					i.bucket_id === active.bucket_id
+				);
+			});
 			if (same) {
 				pick.activeItems = [same];
 			}
@@ -336,10 +345,22 @@ export class StatusBarManager {
 
 	/** Pinning something the current display mode hides would show nothing; widen the mode to 'both'. */
 	private async ensure_display_mode(needed: 'models' | 'groups'): Promise<void> {
-		const config = vscode.workspace.getConfiguration('agq');
-		const mode = config.get<display_mode>('displayMode') ?? 'models';
+		const mode = this.config_manager.get_config().display_mode;
 		if (mode !== needed && mode !== 'both') {
-			await config.update('displayMode', 'both', vscode.ConfigurationTarget.Global);
+			const config = vscode.workspace.getConfiguration('agq');
+			const inspected = config.inspect<display_mode>('displayMode');
+			const legacy_inspected = vscode.workspace.getConfiguration('agQuota').inspect<display_mode>('displayMode');
+			const target =
+				inspected?.workspaceFolderValue !== undefined
+					? vscode.ConfigurationTarget.WorkspaceFolder
+					: inspected?.workspaceValue !== undefined
+					? vscode.ConfigurationTarget.Workspace
+					: inspected?.globalValue === undefined && legacy_inspected?.workspaceFolderValue !== undefined
+					? vscode.ConfigurationTarget.WorkspaceFolder
+					: inspected?.globalValue === undefined && legacy_inspected?.workspaceValue !== undefined
+					? vscode.ConfigurationTarget.Workspace
+					: vscode.ConfigurationTarget.Global;
+			await config.update('displayMode', 'both', target);
 		}
 	}
 
@@ -391,12 +412,17 @@ export class StatusBarManager {
 					const bar = pct !== undefined ? draw_progress_bar(pct) : '░'.repeat(10);
 					const window_label = bucket.window === 'weekly' ? 'Weekly' : bucket.window === '5h' ? '5-Hour' : bucket.display_name;
 
-					const child_item: vscode.QuickPickItem & {group_name?: string; group_display_name?: string} = {
+					const child_item: vscode.QuickPickItem & {
+						group_name?: string;
+						group_display_name?: string;
+						bucket_id?: string;
+					} = {
 						label: `      ${window_label}: ${bar} ${pct_display}`,
 						description: `Resets in: ${bucket.time_until_reset_formatted}`,
 					};
 					child_item.group_name = short_name;
 					child_item.group_display_name = group.display_name;
+					child_item.bucket_id = bucket.bucket_id;
 					items.push(child_item);
 				}
 			}
